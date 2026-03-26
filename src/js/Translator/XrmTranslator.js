@@ -147,11 +147,11 @@
     };
 
     XrmTranslator.GetSolution = function() {
-        return w2ui.grid_toolbar.get("solutionSelect").selected;
+        return w2ui.filterbar.get("solutionSelect").selected;
     }
 
     XrmTranslator.GetEntity = function() {
-        return w2ui.grid_toolbar.get("entitySelect").selected;
+        return w2ui.filterbar.get("entitySelect").selected;
     }
 
     XrmTranslator.GetEntityId = function() {
@@ -159,11 +159,11 @@
     }
 
     XrmTranslator.GetType = function() {
-        return w2ui.grid_toolbar.get("type").selected;
+        return w2ui.filterbar.get("type").selected;
     }
 
     XrmTranslator.GetComponent = function() {
-        return w2ui.grid_toolbar.get("component").selected;
+        return w2ui.filterbar.get("component").selected;
     }
 
     function SetHandler() {
@@ -204,6 +204,7 @@
 
         w2ui.grid.refresh();
         w2ui.grid_toolbar.refresh();
+        w2ui.filterbar.refresh();
     }
 
     XrmTranslator.errorHandler = function(error) {
@@ -758,42 +759,30 @@
                 name: 'findAndReplace',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0">'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Replace in Column:</label>'+
-                    '        <div>'+
-                    '           <input name="column" type="list"/>'+
-                    '        </div>'+
+                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Replace in Column: <span style="color: red;">*</span></label>'+
+                    '        <input name="column" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Find:</label>'+
-                    '        <div>'+
-                    '            <input name="find" type="text"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Find: <span style="color: red;">*</span></label>'+
+                    '        <input name="find" type="text" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Replace:</label>'+
-                    '        <div>'+
-                    '            <input name="replace" type="text"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Replace: <span style="color: red;">*</span></label>'+
+                    '        <input name="replace" type="text" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Use Regex:</label>'+
-                    '        <div>'+
-                    '            <input name="regex" type="checkbox"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Use Regex:</label>'+
+                    '        <input name="regex" type="checkbox"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Ignore Case:</label>'+
-                    '        <div>'+
-                    '            <input name="ignoreCase" type="checkbox"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Ignore Case:</label>'+
+                    '        <input name="ignoreCase" type="checkbox"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Select records:</label>'+
-                    '        <div>'+
-                    '            <input name="selectRecords" type="checkbox"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Select records:</label>'+
+                    '        <input name="selectRecords" type="checkbox"/>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -838,7 +827,7 @@
                 name    : 'findAndReplacePopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
                 style   : 'padding: 15px 0px 0px 0px',
-                width   : 500,
+                width   : 650,
                 height  : 300,
                 showMax : true,
                 onToggle: function (event) {
@@ -1070,7 +1059,7 @@
     }
 
     function InitializeGrid (entities) {
-        var items = [
+        var filterItems = [
             { type: 'menu-radio', id: 'solutionSelect', img: 'icon-folder',
                 text: function (item) {
                     var el = this.get('solutionSelect:' + item.selected);
@@ -1135,7 +1124,61 @@
                     { id: 'Description', text: 'Description', icon: 'fa-picture' }
                 ]
             },
-            { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: LoadHandler },
+            { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: LoadHandler }
+        ];
+
+        $('#filterbar').w2toolbar({
+            name: 'filterbar',
+            items: filterItems,
+            onClick: function (event) {
+                var target = event.target;
+
+                if (target.startsWith("solutionSelect:")) {
+                    var selectedSolutionId = target.replace("solutionSelect:", "");
+                    RepopulateEntitySelector(selectedSolutionId);
+                }
+
+                if (target.startsWith("entitySelect:")) {
+                    if (target === "entitySelect:none") {
+                        w2ui['filterbar'].disable('type:attributes');
+                        w2ui['filterbar'].disable('type:options');
+                        w2ui['filterbar'].disable('type:views');
+                        w2ui['filterbar'].disable('type:entityMeta');
+                        w2ui['filterbar'].disable('type:charts');
+                        w2ui['filterbar'].disable('type:content');
+                        w2ui['filterbar'].disable('type:forms');
+                        w2ui['filterbar'].disable('type:formMeta');
+
+                        w2ui['filterbar'].enable('type:webresources');
+                        w2ui['filterbar'].enable('type:dashboards');
+                    }
+                    else {
+                        w2ui['filterbar'].enable('type:attributes');
+                        w2ui['filterbar'].enable('type:options');
+                        w2ui['filterbar'].enable('type:views');
+                        w2ui['filterbar'].enable('type:entityMeta');
+                        w2ui['filterbar'].enable('type:charts');
+                        w2ui['filterbar'].enable('type:forms');
+                        w2ui['filterbar'].enable('type:formMeta');
+
+                        w2ui['filterbar'].disable('type:webresources');
+                        w2ui['filterbar'].disable('type:dashboards');
+                        w2ui['filterbar'].disable('type:content');
+
+                        if (target === "entitySelect:Adx_contentsnippet") {
+                            w2ui['filterbar'].enable('type:content');
+                        }
+
+                        if (["content", "webresources", "dashboards"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
+                            w2ui.filterbar.get("type").selected = "attributes";
+                            w2ui.filterbar.refresh();
+                        }
+                    }
+                }
+            }
+        });
+
+        var items = [
             { type: 'button', hidden: true, id: 'removeOverriddenAttributeLabels', text: 'Remove Overridden Attribute Labels', img:'w2ui-icon-cross', onClick: function(event) {
                 FormHandler.RemoveOverriddenCellLabels();
             }}
@@ -1200,50 +1243,6 @@
                 onClick: function (event) {
                     var target = event.target;
 
-                    if (target.startsWith("solutionSelect:")) {
-                        var selectedSolutionId = target.replace("solutionSelect:", "");
-                        RepopulateEntitySelector(selectedSolutionId);
-                    }
-
-                    if (target.startsWith("entitySelect:")) {
-                        if (target === "entitySelect:none") { //None click
-                            w2ui['grid_toolbar'].disable('type:attributes');
-                            w2ui['grid_toolbar'].disable('type:options');
-                            w2ui['grid_toolbar'].disable('type:views');
-                            w2ui['grid_toolbar'].disable('type:entityMeta');
-                            w2ui['grid_toolbar'].disable('type:charts');
-                            w2ui['grid_toolbar'].disable('type:content');
-                            w2ui['grid_toolbar'].disable('type:forms');
-                            w2ui['grid_toolbar'].disable('type:formMeta');
-
-                            w2ui['grid_toolbar'].enable('type:webresources');
-                            w2ui['grid_toolbar'].enable('type:dashboards');
-                        }
-                        else {
-                            w2ui['grid_toolbar'].enable('type:attributes');
-                            w2ui['grid_toolbar'].enable('type:options');
-                            w2ui['grid_toolbar'].enable('type:views');
-                            w2ui['grid_toolbar'].enable('type:entityMeta');
-                            w2ui['grid_toolbar'].enable('type:charts');
-                            w2ui['grid_toolbar'].enable('type:forms');
-                            w2ui['grid_toolbar'].enable('type:formMeta');
-
-                            w2ui['grid_toolbar'].disable('type:webresources');
-                            w2ui['grid_toolbar'].disable('type:dashboards');
-                            w2ui['grid_toolbar'].disable('type:content');
-
-                            if (target === "entitySelect:Adx_contentsnippet") {
-                                w2ui['grid_toolbar'].enable('type:content');
-                            }
-                            
-                            // Switch back to attributes if one of the now disabled options was set
-                            if (["content", "webresources", "dashboards"].indexOf(w2ui.grid_toolbar.get("type").selected) !== -1) {
-                                w2ui.grid_toolbar.get("type").selected = "attributes";
-                                w2ui.grid_toolbar.refresh();
-                            }
-                        }
-                    }
-
                     if (target.indexOf("expandAll") !== -1) {
                         ToggleExpandCollapse(true);
                     } else if (target.indexOf("collapseAll") !== -1) {
@@ -1271,7 +1270,7 @@
         }
 
         entities = entities.sort(XrmTranslator.EntityComparer);
-        var entitySelect = w2ui.grid_toolbar.get("entitySelect").items;
+        var entitySelect = w2ui.filterbar.get("entitySelect").items;
 
         for (var i = 0; i < entities.length; i++) {
             var entity = entities[i];
@@ -1303,7 +1302,7 @@
     }
 
     function FillSolutionSelector(solutions) {
-        var solutionSelect = w2ui.grid_toolbar.get("solutionSelect").items;
+        var solutionSelect = w2ui.filterbar.get("solutionSelect").items;
 
         for (var i = 0; i < solutions.length; i++) {
             var solution = solutions[i];
@@ -1335,7 +1334,7 @@
     }
 
     function RepopulateEntitySelector(solutionId) {
-        var entitySelectItem = w2ui.grid_toolbar.get("entitySelect");
+        var entitySelectItem = w2ui.filterbar.get("entitySelect");
         entitySelectItem.selected = "none";
         entitySelectItem.items = [
             { id: 'none', text: 'None' },
@@ -1345,7 +1344,7 @@
 
         if (!solutionId || solutionId === 'all') {
             FillEntitySelector(XrmTranslator.allEntities);
-            w2ui.grid_toolbar.refresh();
+            w2ui.filterbar.refresh();
             return Promise.resolve();
         }
 
@@ -1357,7 +1356,7 @@
                 return metadataIds.indexOf(e.MetadataId.toLowerCase()) !== -1;
             });
             FillEntitySelector(solutionEntities);
-            w2ui.grid_toolbar.refresh();
+            w2ui.filterbar.refresh();
             XrmTranslator.UnlockGrid();
         })
         .catch(XrmTranslator.errorHandler);

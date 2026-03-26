@@ -621,30 +621,22 @@
                 name: 'translationPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0">'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Source Lcid:</label>'+
-                    '        <div>'+
-                    '           <input name="sourceLcid" type="list"/>'+
-                    '        </div>'+
+                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 110px; white-space: nowrap;">Source Lcid: <span style="color: red;">*</span></label>'+
+                    '        <input name="sourceLcid" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Target Lcid:</label>'+
-                    '        <div>'+
-                    '            <input name="targetLcid" type="list"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 110px; white-space: nowrap;">Target Lcid: <span style="color: red;">*</span></label>'+
+                    '        <input name="targetLcid" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Translate All:</label>'+
-                    '        <div>'+
-                    '            <input name="translateMissing" type="list"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 110px; white-space: nowrap;">Translate All:</label>'+
+                    '        <input name="translateMissing" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>API Provider:</label>'+
-                    '        <div>'+
-                    '            <input name="apiProvider" type="list"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 110px; white-space: nowrap;">API Provider:</label>'+
+                    '        <input name="apiProvider" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -718,8 +710,8 @@
                 name    : 'translationPopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
                 style   : 'padding: 15px 0px 0px 0px',
-                width   : 500,
-                height  : 300,
+                width   : 650,
+                height  : 320,
                 showMax : true,
                 onToggle: function (event) {
                     $(w2ui.translationPrompt.box).hide();
@@ -752,24 +744,18 @@
                 name: 'geminiSettings',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0">'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>API Key:</label>'+
-                    '        <div>'+
-                    '           <input name="apiKey" type="text" style="width: 300px;"/>'+
-                    '        </div>'+
+                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
+                    '        <input name="apiKey" type="text" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Model Name:</label>'+
-                    '        <div>'+
-                    '            <input name="modelName" type="text" style="width: 300px;"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
+                    '        <input name="modelName" type="text" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Custom Prompt:</label>'+
-                    '        <div>'+
-                    '            <textarea name="customPrompt" style="width: 300px; height: 80px;"></textarea>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
+                    '        <textarea name="customPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -830,7 +816,7 @@
                 name    : 'geminiSettingsPopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
                 style   : 'padding: 15px 0px 0px 0px',
-                width   : 500,
+                width   : 650,
                 height  : 350,
                 showMax : true,
                 onToggle: function (event) {
