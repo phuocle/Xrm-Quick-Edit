@@ -246,12 +246,10 @@
                 name: 'formSelectionPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0">'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Form:</label>'+
-                    '        <div>'+
-                    '           <input name="formSelection" type="list" />'+
-                    '        </div>'+
+                    '<div class="w2ui-page page-0" style="padding: 20px 25px;">'+
+                    '    <div style="display: flex; align-items: center;">'+
+                    '        <label style="margin-right: 10px; white-space: nowrap;">Form: <span style="color: red;">*</span></label>'+
+                    '        <input name="formSelection" type="list" style="flex: 1; width: 100%;" />'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -259,7 +257,7 @@
                     '    <button class="w2ui-btn" name="ok">Ok</button>'+
                     '</div>',
                 fields: [
-                    { field: 'formSelection', type: 'list', required: true, html: {attr: 'style="width: 80%"'} }
+                    { field: 'formSelection', type: 'list', required: true, html: {attr: 'style="width: 100%"'} }
                 ],
                 actions: {
                     "ok": function () {
@@ -281,12 +279,24 @@
 
         var formItems = [];
 
+        var formTypeMap = {
+            0: "Dashboard",
+            2: "Main",
+            5: "Mobile Express",
+            6: "Quick View",
+            7: "Quick Create",
+            10: "App Module Main",
+            11: "Interactive Experience",
+            12: "Card Form"
+        };
+
         for (var i = 0; i < userLanguageForms.length; i++) {
             var form = userLanguageForms[i];
+            var formTypeName = formTypeMap[form.type] || ("Type " + form.type);
 
             formItems.push({
                 id: form.formid,
-                text: form.name + " - " + form.description
+                text: form.name + " - " + (form.description || "") + " [" + formTypeName + "]"
             });
         }
 
@@ -298,8 +308,8 @@
             name    : 'formSelectionPopup',
             body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
             style   : 'padding: 15px 0px 0px 0px',
-            width   : 500,
-            height  : 300,
+            width   : 650,
+            height  : 250,
             showMax : true,
             onToggle: function (event) {
                 $(w2ui.formSelection.box).hide();
@@ -313,6 +323,9 @@
                     // specifying an onOpen handler instead is equivalent to specifying an onBeforeOpen handler, which would make this code execute too early and hence not deliver.
                     $('#w2ui-popup #form').w2render('formSelectionPrompt');
                 }
+            },
+            onClose: function (event) {
+                XrmTranslator.UnlockGrid();
             }
         });
     }

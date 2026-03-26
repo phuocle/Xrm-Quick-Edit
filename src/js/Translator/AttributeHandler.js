@@ -54,6 +54,35 @@
         }
     }
 
+    function SanitizeForPut(obj) {
+        if (obj === null || obj === undefined) {
+            return obj;
+        }
+        if (Array.isArray(obj)) {
+            for (var i = 0; i < obj.length; i++) {
+                obj[i] = SanitizeForPut(obj[i]);
+            }
+            return obj;
+        }
+        if (typeof obj === "object") {
+            for (var key in obj) {
+                if (!obj.hasOwnProperty(key)) {
+                    continue;
+                }
+                if (key.toLowerCase() === "versionnumber") {
+                    delete obj[key];
+                    continue;
+                }
+                obj[key] = SanitizeForPut(obj[key]);
+            }
+            return obj;
+        }
+        if (typeof obj === "number" && !Number.isSafeInteger(obj) && Number.isInteger(obj)) {
+            return undefined;
+        }
+        return obj;
+    }
+
     function GetUpdates() {
         var records = XrmTranslator.GetGrid().records;
 
@@ -69,7 +98,7 @@
                 var changes = record.w2ui.changes;
 
                 ApplyChanges(changes, labels);
-                updates.push(attribute);
+                updates.push(SanitizeForPut(JSON.parse(JSON.stringify(attribute))));
             }
         }
 
@@ -97,6 +126,10 @@
             }
             // Some attributes such as versionnumber can not be renamed / translated
             else if (attribute.IsRenameable && !attribute.IsRenameable.Value) {
+                all.push(attribute.SchemaName);
+            }
+            // BigInt attributes (e.g. versionnumber) cannot be updated via the metadata API
+            else if (attribute.AttributeType === "BigInt") {
                 all.push(attribute.SchemaName);
             }
 

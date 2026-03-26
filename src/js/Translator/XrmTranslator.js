@@ -45,7 +45,10 @@
 
     XrmTranslator.defaultSchemaNameSize = "20%";
 
+    XrmTranslator.allEntities = [];
+
     var currentHandler = null;
+    var solutionEntityCache = {};
 
     RegExp.escape= function(s) {
         return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -143,8 +146,12 @@
         CustomControlDefaultConfig: 68,
     };
 
+    XrmTranslator.GetSolution = function() {
+        return w2ui.filterbar.get("solutionSelect").selected;
+    }
+
     XrmTranslator.GetEntity = function() {
-        return w2ui.grid_toolbar.get("entitySelect").selected;
+        return w2ui.filterbar.get("entitySelect").selected;
     }
 
     XrmTranslator.GetEntityId = function() {
@@ -152,11 +159,11 @@
     }
 
     XrmTranslator.GetType = function() {
-        return w2ui.grid_toolbar.get("type").selected;
+        return w2ui.filterbar.get("type").selected;
     }
 
     XrmTranslator.GetComponent = function() {
-        return w2ui.grid_toolbar.get("component").selected;
+        return w2ui.filterbar.get("component").selected;
     }
 
     function SetHandler() {
@@ -197,6 +204,7 @@
 
         w2ui.grid.refresh();
         w2ui.grid_toolbar.refresh();
+        w2ui.filterbar.refresh();
     }
 
     XrmTranslator.errorHandler = function(error) {
@@ -627,14 +635,15 @@
         return r;
     }
 
-    XrmTranslator.ShowRecordSelector = function (callbackName, callbackParameters, preselectedRecords) {
+    XrmTranslator.ShowRecordSelector = function (callbackName, callbackParameters, preselectedRecords, recordFilter) {
         if (!w2ui.recordSelectorGrid) {
             var grid = {
                 name: 'recordSelectorGrid',
                 show: { selectColumn: true },
                 multiSelect: true,
                 columns: [
-                    { field: 'schemaName', caption: 'Schema Name', size: '100%', sortable: true, searchable: true }
+                    { field: 'schemaName', caption: 'Schema Name', size: '30%', sortable: true, searchable: true },
+                    { field: 'sourceText', caption: 'Source Text', size: '70%', sortable: true, searchable: true }
                 ],
                 records: [],
                 onSelect: function(event) {
@@ -675,7 +684,45 @@
 
         w2ui.recordSelectorGrid.reset(true);
         w2ui.recordSelectorGrid.clear();
-        w2ui.recordSelectorGrid.add(JSON.parse(JSON.stringify(XrmTranslator.GetGrid().records)).map(removeHideCheckBoxFlag));
+        var allRecords = JSON.parse(JSON.stringify(XrmTranslator.GetGrid().records)).map(removeHideCheckBoxFlag);
+
+        var baseLang = XrmTranslator.baseLanguage ? XrmTranslator.baseLanguage.toString() : null;
+        if (baseLang) {
+            var setSourceTextRecursive = function(record, lang) {
+                record.sourceText = record[lang] || '';
+                if (record.w2ui && Array.isArray(record.w2ui.children)) {
+                    record.w2ui.children.forEach(function(child) {
+                        setSourceTextRecursive(child, lang);
+                    });
+                }
+            };
+            allRecords.forEach(function(r) {
+                setSourceTextRecursive(r, baseLang);
+            });
+        }
+
+        var filteredRecords;
+        if (recordFilter) {
+            var filterRecursive = function(records) {
+                return records.filter(function(r) {
+                    if (r.w2ui && Array.isArray(r.w2ui.children)) {
+                        r.w2ui.children = filterRecursive(r.w2ui.children);
+                        if (r.w2ui.children.length > 0) return true;
+                    }
+                    return recordFilter(r);
+                });
+            };
+            filteredRecords = filterRecursive(allRecords);
+        } else {
+            filteredRecords = allRecords;
+        }
+
+        if (recordFilter && filteredRecords.length === 0) {
+            w2alert("No matching records found. All records already have translations for the target language.");
+            return;
+        }
+
+        w2ui.recordSelectorGrid.add(filteredRecords);
         w2ui.recordSelectorGrid.refresh();
 
         var callbackString = (callbackParameters || []).map(function(p) { return typeof(p) === "string" ? "'" + p + "'" : p + ""; }).join(",");
@@ -729,42 +776,30 @@
                 name: 'findAndReplace',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0">'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Replace in Column:</label>'+
-                    '        <div>'+
-                    '           <input name="column" type="list"/>'+
-                    '        </div>'+
+                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Replace in Column: <span style="color: red;">*</span></label>'+
+                    '        <input name="column" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Find:</label>'+
-                    '        <div>'+
-                    '            <input name="find" type="text"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Find: <span style="color: red;">*</span></label>'+
+                    '        <input name="find" type="text" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Replace:</label>'+
-                    '        <div>'+
-                    '            <input name="replace" type="text"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Replace: <span style="color: red;">*</span></label>'+
+                    '        <input name="replace" type="text" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Use Regex:</label>'+
-                    '        <div>'+
-                    '            <input name="regex" type="checkbox"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Use Regex:</label>'+
+                    '        <input name="regex" type="checkbox"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Ignore Case:</label>'+
-                    '        <div>'+
-                    '            <input name="ignoreCase" type="checkbox"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Ignore Case:</label>'+
+                    '        <input name="ignoreCase" type="checkbox"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Select records:</label>'+
-                    '        <div>'+
-                    '            <input name="selectRecords" type="checkbox"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 130px; white-space: nowrap;">Select records:</label>'+
+                    '        <input name="selectRecords" type="checkbox"/>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -809,7 +844,7 @@
                 name    : 'findAndReplacePopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
                 style   : 'padding: 15px 0px 0px 0px',
-                width   : 500,
+                width   : 650,
                 height  : 300,
                 showMax : true,
                 onToggle: function (event) {
@@ -1041,7 +1076,21 @@
     }
 
     function InitializeGrid (entities) {
-        var items = [
+        var filterItems = [
+            { type: 'menu-radio', id: 'solutionSelect', img: 'icon-folder',
+                text: function (item) {
+                    var el = this.get('solutionSelect:' + item.selected);
+                    if (el) {
+                        return 'Solution: ' + el.text;
+                    }
+                    return 'Choose solution';
+                },
+                selected: 'all',
+                items: [
+                    { id: 'all', text: 'Default Solution' },
+                    { text: '--' }
+                ]
+            },
             { type: 'menu-radio', id: 'entitySelect', img: 'icon-folder',
                 text: function (item) {
                     var text = item.selected;
@@ -1092,7 +1141,61 @@
                     { id: 'Description', text: 'Description', icon: 'fa-picture' }
                 ]
             },
-            { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: LoadHandler },
+            { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: LoadHandler }
+        ];
+
+        $('#filterbar').w2toolbar({
+            name: 'filterbar',
+            items: filterItems,
+            onClick: function (event) {
+                var target = event.target;
+
+                if (target.startsWith("solutionSelect:")) {
+                    var selectedSolutionId = target.replace("solutionSelect:", "");
+                    RepopulateEntitySelector(selectedSolutionId);
+                }
+
+                if (target.startsWith("entitySelect:")) {
+                    if (target === "entitySelect:none") {
+                        w2ui['filterbar'].disable('type:attributes');
+                        w2ui['filterbar'].disable('type:options');
+                        w2ui['filterbar'].disable('type:views');
+                        w2ui['filterbar'].disable('type:entityMeta');
+                        w2ui['filterbar'].disable('type:charts');
+                        w2ui['filterbar'].disable('type:content');
+                        w2ui['filterbar'].disable('type:forms');
+                        w2ui['filterbar'].disable('type:formMeta');
+
+                        w2ui['filterbar'].enable('type:webresources');
+                        w2ui['filterbar'].enable('type:dashboards');
+                    }
+                    else {
+                        w2ui['filterbar'].enable('type:attributes');
+                        w2ui['filterbar'].enable('type:options');
+                        w2ui['filterbar'].enable('type:views');
+                        w2ui['filterbar'].enable('type:entityMeta');
+                        w2ui['filterbar'].enable('type:charts');
+                        w2ui['filterbar'].enable('type:forms');
+                        w2ui['filterbar'].enable('type:formMeta');
+
+                        w2ui['filterbar'].disable('type:webresources');
+                        w2ui['filterbar'].disable('type:dashboards');
+                        w2ui['filterbar'].disable('type:content');
+
+                        if (target === "entitySelect:Adx_contentsnippet") {
+                            w2ui['filterbar'].enable('type:content');
+                        }
+
+                        if (["content", "webresources", "dashboards"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
+                            w2ui.filterbar.get("type").selected = "attributes";
+                            w2ui.filterbar.refresh();
+                        }
+                    }
+                }
+            }
+        });
+
+        var items = [
             { type: 'button', hidden: true, id: 'removeOverriddenAttributeLabels', text: 'Remove Overridden Attribute Labels', img:'w2ui-icon-cross', onClick: function(event) {
                 FormHandler.RemoveOverriddenCellLabels();
             }}
@@ -1103,6 +1206,10 @@
                 TranslationHandler.ShowTranslationPrompt();
             } });
         }
+
+        items.push({ type: 'button', id: 'geminiSettings', text: 'Gemini Settings', img:'icon-page', onClick: function (event) {
+            TranslationHandler.ShowGeminiSettings();
+        } });
 
         if (XrmTranslator.config.enableLocking) {
             items.push({ type: 'menu-radio', id: 'lockOrUnlock', img: 'w2ui-icon-cross',
@@ -1153,45 +1260,6 @@
                 onClick: function (event) {
                     var target = event.target;
 
-                    if (target.startsWith("entitySelect:")) {
-                        if (target === "entitySelect:none") { //None click
-                            w2ui['grid_toolbar'].disable('type:attributes');
-                            w2ui['grid_toolbar'].disable('type:options');
-                            w2ui['grid_toolbar'].disable('type:views');
-                            w2ui['grid_toolbar'].disable('type:entityMeta');
-                            w2ui['grid_toolbar'].disable('type:charts');
-                            w2ui['grid_toolbar'].disable('type:content');
-                            w2ui['grid_toolbar'].disable('type:forms');
-                            w2ui['grid_toolbar'].disable('type:formMeta');
-
-                            w2ui['grid_toolbar'].enable('type:webresources');
-                            w2ui['grid_toolbar'].enable('type:dashboards');
-                        }
-                        else {
-                            w2ui['grid_toolbar'].enable('type:attributes');
-                            w2ui['grid_toolbar'].enable('type:options');
-                            w2ui['grid_toolbar'].enable('type:views');
-                            w2ui['grid_toolbar'].enable('type:entityMeta');
-                            w2ui['grid_toolbar'].enable('type:charts');
-                            w2ui['grid_toolbar'].enable('type:forms');
-                            w2ui['grid_toolbar'].enable('type:formMeta');
-
-                            w2ui['grid_toolbar'].disable('type:webresources');
-                            w2ui['grid_toolbar'].disable('type:dashboards');
-                            w2ui['grid_toolbar'].disable('type:content');
-
-                            if (target === "entitySelect:Adx_contentsnippet") {
-                                w2ui['grid_toolbar'].enable('type:content');
-                            }
-                            
-                            // Switch back to attributes if one of the now disabled options was set
-                            if (["content", "webresources", "dashboards"].indexOf(w2ui.grid_toolbar.get("type").selected) !== -1) {
-                                w2ui.grid_toolbar.get("type").selected = "attributes";
-                                w2ui.grid_toolbar.refresh();
-                            }
-                        }
-                    }
-
                     if (target.indexOf("expandAll") !== -1) {
                         ToggleExpandCollapse(true);
                     } else if (target.indexOf("collapseAll") !== -1) {
@@ -1219,7 +1287,7 @@
         }
 
         entities = entities.sort(XrmTranslator.EntityComparer);
-        var entitySelect = w2ui.grid_toolbar.get("entitySelect").items;
+        var entitySelect = w2ui.filterbar.get("entitySelect").items;
 
         for (var i = 0; i < entities.length; i++) {
             var entity = entities[i];
@@ -1234,13 +1302,81 @@
 
     function GetEntities() {
         var queryParams = "?$select=SchemaName,LogicalName,MetadataId,DisplayName&$filter=IsCustomizable/Value eq true";
-        
+
         var request = {
             entityName: "EntityDefinition",
             queryParams: queryParams
         };
 
         return WebApiClient.Retrieve(request);
+    }
+
+    function GetSolutions() {
+        return WebApiClient.Retrieve({
+            entityName: "solution",
+            queryParams: "?$select=uniquename,friendlyname,solutionid&$filter=ismanaged eq false and isvisible eq true and uniquename ne 'Default'&$orderby=friendlyname asc"
+        });
+    }
+
+    function FillSolutionSelector(solutions) {
+        var solutionSelect = w2ui.filterbar.get("solutionSelect").items;
+
+        for (var i = 0; i < solutions.length; i++) {
+            var solution = solutions[i];
+            solutionSelect.push({
+                id: solution.solutionid,
+                text: solution.friendlyname + " (" + solution.uniquename + ")"
+            });
+        }
+
+        return solutions;
+    }
+
+    function GetSolutionEntities(solutionId) {
+        if (solutionEntityCache[solutionId]) {
+            return Promise.resolve(solutionEntityCache[solutionId]);
+        }
+
+        return WebApiClient.Retrieve({
+            entityName: "solutioncomponent",
+            queryParams: "?$select=objectid&$filter=_solutionid_value eq " + solutionId + " and componenttype eq 1"
+        })
+        .then(function(response) {
+            var metadataIds = response.value.map(function(c) {
+                return c.objectid.toLowerCase();
+            });
+            solutionEntityCache[solutionId] = metadataIds;
+            return metadataIds;
+        });
+    }
+
+    function RepopulateEntitySelector(solutionId) {
+        var entitySelectItem = w2ui.filterbar.get("entitySelect");
+        entitySelectItem.selected = "none";
+        entitySelectItem.items = [
+            { id: 'none', text: 'None' },
+            { text: '--' }
+        ];
+        XrmTranslator.entityMetadata = {};
+
+        if (!solutionId || solutionId === 'all') {
+            FillEntitySelector(XrmTranslator.allEntities);
+            w2ui.filterbar.refresh();
+            return Promise.resolve();
+        }
+
+        XrmTranslator.LockGrid("Loading solution entities...");
+
+        return GetSolutionEntities(solutionId)
+        .then(function(metadataIds) {
+            var solutionEntities = XrmTranslator.allEntities.filter(function(e) {
+                return metadataIds.indexOf(e.MetadataId.toLowerCase()) !== -1;
+            });
+            FillEntitySelector(solutionEntities);
+            w2ui.filterbar.refresh();
+            XrmTranslator.UnlockGrid();
+        })
+        .catch(XrmTranslator.errorHandler);
     }
 
     function GetUserId() {
@@ -1378,10 +1514,16 @@
         .then(function (response) {
             XrmTranslator.userSettings = response;
 
-            return GetEntities();
+            return Promise.all([GetEntities(), GetSolutions()]);
         })
-        .then(function(response) {
-            return FillEntitySelector(response.value);
+        .then(function(results) {
+            var entities = results[0].value;
+            var solutions = results[1].value;
+
+            XrmTranslator.allEntities = entities;
+
+            FillSolutionSelector(solutions);
+            return FillEntitySelector(entities);
         })
         .then(function () {
             return TranslationHandler.GetAvailableLanguages();

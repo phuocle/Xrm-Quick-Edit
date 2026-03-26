@@ -26,6 +26,36 @@
     "use strict";
     
     var locales = null;
+    var GEMINI_CONFIG_KEY = "XrmQuickEdit_GeminiConfig";
+    var TRANSLATION_PROMPT_KEY = "XrmQuickEdit_TranslationPrompt";
+
+    function GetSavedTranslationPrompt() {
+        try {
+            var stored = localStorage.getItem(TRANSLATION_PROMPT_KEY);
+            return stored ? JSON.parse(stored) : null;
+        } catch(e) {
+            return null;
+        }
+    }
+
+    function SaveTranslationPrompt(values) {
+        localStorage.setItem(TRANSLATION_PROMPT_KEY, JSON.stringify(values));
+    }
+
+    function GetGeminiConfig() {
+        try {
+            var stored = localStorage.getItem(GEMINI_CONFIG_KEY);
+            return stored ? JSON.parse(stored) : { apiKey: "", modelName: "gemini-2.0-flash", customPrompt: "" };
+        } catch(e) {
+            return { apiKey: "", modelName: "gemini-2.0-flash", customPrompt: "" };
+        }
+    }
+
+    function SaveGeminiConfig(config) {
+        localStorage.setItem(GEMINI_CONFIG_KEY, JSON.stringify(config));
+    }
+
+    TranslationHandler.GetGeminiConfig = GetGeminiConfig;
 
     function GetLanguageIsoByLcid (lcid) {
         var locByLocales = locales.find(function(loc) { return loc.localeid === lcid; });
@@ -214,6 +244,91 @@
         }
     };
 
+    const geminiTranslator = function (apiKey, modelName, customPrompt) {
+        var apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" +
+            encodeURIComponent(modelName) + ":generateContent";
+
+        this.GetBatchTranslations = function(fromLanguage, destLanguage, phrases) {
+            $.support.cors = true;
+
+            var systemInstructions = "You are a professional translator for a Microsoft Dynamics CRM / Dataverse system. " +
+                "Translate the following labels from " + fromLanguage + " to " + destLanguage + ". " +
+                (customPrompt ? customPrompt + " " : "") +
+                "Return ONLY a valid JSON array of translated strings in the exact same order as provided. " +
+                "Do not add any explanation, markdown formatting, or code fences. " +
+                "The array must have exactly " + phrases.length + " elements.";
+
+            var userMessage = JSON.stringify(phrases);
+
+            var requestBody = {
+                contents: [{
+                    role: "user",
+                    parts: [{ text: systemInstructions + "\n\nLabels to translate:\n" + userMessage }]
+                }]
+            };
+
+            return WebApiClient.Promise.resolve($.ajax({
+                url: apiUrl + "?key=" + encodeURIComponent(apiKey),
+                type: "POST",
+                crossDomain: true,
+                contentType: "application/json",
+                dataType: "json",
+                data: JSON.stringify(requestBody)
+            }))
+            .then(function(response) {
+                if (!response || !response.candidates || !response.candidates[0] ||
+                    !response.candidates[0].content || !response.candidates[0].content.parts ||
+                    !response.candidates[0].content.parts[0] || !response.candidates[0].content.parts[0].text) {
+                    var errorMsg = (response && response.error && response.error.message) || "No translation returned";
+                    throw new Error("Gemini API error: " + errorMsg);
+                }
+                var text = response.candidates[0].content.parts[0].text;
+                text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+
+                var translations = JSON.parse(text);
+
+                if (!Array.isArray(translations) || translations.length !== phrases.length) {
+                    throw new Error("Gemini returned " + (translations ? translations.length : 0) +
+                        " translations but " + phrases.length + " were expected.");
+                }
+
+                return translations;
+            });
+        };
+
+        this.AddTranslations = function(fromLcid, destLcid, updateRecords, translatedPhrases) {
+            var translations = [];
+
+            for (var i = 0; i < updateRecords.length; i++) {
+                var translated = translatedPhrases[i];
+                var record = updateRecords[i];
+
+                if (!translated) {
+                    continue;
+                }
+
+                var translation = w2utils.encodeTags(translated);
+
+                translations.push({
+                    recid: record.recid,
+                    schemaName: record.schemaName,
+                    column: destLcid,
+                    source: record[fromLcid],
+                    translation: translation
+                });
+            }
+
+            return translations;
+        };
+
+        this.CanTranslate = function(fromLcid, destLcid) {
+            return WebApiClient.Promise.resolve({
+                [fromLcid]: true,
+                [destLcid]: true
+            });
+        };
+    };
+
     TranslationHandler.ApplyTranslations = function (selected, results) {
         var grid = XrmTranslator.GetGrid();
         var savable = false;
@@ -300,6 +415,9 @@
                 return new deeplTranslator(authKey);
             case "azure":
                 return new azureTranslator(authKey, region);
+            case "gemini":
+                var geminiConfig = GetGeminiConfig();
+                return new geminiTranslator(geminiConfig.apiKey, geminiConfig.modelName, geminiConfig.customPrompt);
             default:
                 return null;
         }
@@ -312,10 +430,37 @@
     }
 
     function FindTranslator(authKey, authProvider, region, fromLcid, destLcid, apiProvider, preFallBackError) {
+        // When user explicitly selected gemini, handle it directly regardless of config provider
+        if (apiProvider === "gemini") {
+            var geminiConfig = GetGeminiConfig();
+            if (!geminiConfig || !geminiConfig.apiKey) {
+                XrmTranslator.UnlockGrid();
+                return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, "Gemini: API Key is missing. Please configure it via the Gemini Settings button.")]);
+            }
+            var translator = CreateTranslator("gemini");
+            return translator.CanTranslate(fromLcid, destLcid)
+            .then(function(canTranslate) {
+                return [translator];
+            });
+        }
+
         if(apiProvider !== "auto" && (authProvider ||"").trim().toLowerCase() !== apiProvider) {
             return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, "")]);
         }
-        
+
+        if ((authProvider || "").trim().toLowerCase() === "gemini") {
+            var geminiConfig = GetGeminiConfig();
+            if (!geminiConfig || !geminiConfig.apiKey) {
+                XrmTranslator.UnlockGrid();
+                return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, "Gemini: API Key is missing. Please configure it via the Gemini Settings button.")]);
+            }
+            var translator = CreateTranslator("gemini");
+            return translator.CanTranslate(fromLcid, destLcid)
+            .then(function(canTranslate) {
+                return [translator];
+            });
+        }
+
         if (!authKey) {
             XrmTranslator.UnlockGrid();
             return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, authProvider + ": Auth Key is missing, please add one in the config web resource")]);
@@ -325,7 +470,7 @@
 
         if (!translator) {
             XrmTranslator.UnlockGrid();
-            return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, authProvider  + ": Found not supported or missing API Provider, please set one in the config web resource (currently only 'deepl' and 'azure' are supported")]);
+            return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, authProvider  + ": Found not supported or missing API Provider, please set one in the config web resource (currently only 'deepl', 'azure' and 'gemini' are supported)")]);
         }
 
         return translator.CanTranslate(fromLcid, destLcid)
@@ -341,7 +486,7 @@
     }
 
     TranslationHandler.ProposeTranslations = function(recordsRaw, fromLcid, destLcid, translateMissing, apiProvider) {
-        XrmTranslator.LockGrid("Translating...");    
+        XrmTranslator.LockGrid("Translating...");
 
         var records = !translateMissing
             ? recordsRaw
@@ -376,12 +521,13 @@
             var translator = result[0];
 
             if (!translator) {
-                w2alert(result[1]);
+                var errorMsg = result[1] || "(No error message returned - check config)";
+                XrmTranslator.UnlockGrid();
+                w2alert(errorMsg);
                 return null;
             }
 
             var updateRecords = [];
-            var translationRequests = [];
 
             for (var i = 0; i < records.length; i++) {
                 var record = records[i];
@@ -391,23 +537,54 @@
                     continue;
                 }
 
+                updateRecords.push(record);
+            }
+
+            if (updateRecords.length === 0) {
+                XrmTranslator.UnlockGrid();
+                w2alert("No records to translate. All selected records have empty source text for the source language.");
+                return null;
+            }
+
+            // Batch mode (Gemini AI)
+            if (translator.GetBatchTranslations) {
+                var phrases = updateRecords.map(function(record) {
+                    return w2utils.decodeTags(record[fromLcid]);
+                });
+
+                return translator.GetBatchTranslations(fromIso, toIso, phrases)
+                .then(function(translatedPhrases) {
+                    var results = translator.AddTranslations(fromLcid, destLcid, updateRecords, translatedPhrases);
+                    ShowTranslationResults(results);
+                    XrmTranslator.UnlockGrid();
+                });
+            }
+
+            // Per-phrase mode (DeepL, Azure)
+            var translationRequests = [];
+
+            for (var i = 0; i < updateRecords.length; i++) {
+                var record = updateRecords[i];
+
                 const source = XrmTranslator.config.translationExceptions && XrmTranslator.config.translationExceptions.length
                 ? XrmTranslator.config.translationExceptions.reduce(function(all, cur) {
                     return (all || "").replace(new RegExp(cur, "gmi"), '<escape data="$1"/>')
                 }, record[fromLcid])
                 : record[fromLcid]
 
-                updateRecords.push(record);
                 translationRequests.push(translator.GetTranslation(fromIso, toIso, w2utils.decodeTags(source)));
             }
 
             return WebApiClient.Promise.all(translationRequests)
             .then(function (responses) {
-                ShowTranslationResults(translator.AddTranslations(fromLcid, destLcid, updateRecords, responses));
+                var results = translator.AddTranslations(fromLcid, destLcid, updateRecords, responses);
+                ShowTranslationResults(results);
                 XrmTranslator.UnlockGrid();
             });
         })
-        .catch(XrmTranslator.errorHandler);
+        .catch(function(error) {
+            XrmTranslator.errorHandler(error);
+        });
     }
 
     function InitializeTranslationPrompt () {
@@ -422,36 +599,50 @@
             languageItems.push({ id: availableLanguages[i].field, text: availableLanguages[i].caption });
         }
 
+        var saved = GetSavedTranslationPrompt();
+        var translateMissingItems = [{id: " ", text: " " }, { id: "missing", text: "All Missing" }, { id: "missingOrIdentical", text: "All Missing Or Identical"}];
+        var apiProviderItems = [{id: "auto", text: "Auto" }, { id: "deepl", text: "DeepL" }, { id: "azure", text: "Azure"}, { id: "gemini", text: "Gemini AI"}];
+
+        function findItem(items, id) {
+            if (!id) return null;
+            for (var i = 0; i < items.length; i++) {
+                if (String(items[i].id) === String(id)) return items[i];
+            }
+            return null;
+        }
+
+        var savedRecord = {};
+        if (saved) {
+            var srcItem = findItem(languageItems, saved.sourceLcid);
+            var tgtItem = findItem(languageItems, saved.targetLcid);
+            if (srcItem) savedRecord.sourceLcid = srcItem;
+            if (tgtItem) savedRecord.targetLcid = tgtItem;
+            savedRecord.translateMissing = findItem(translateMissingItems, saved.translateMissing) || translateMissingItems[0];
+            savedRecord.apiProvider = findItem(apiProviderItems, saved.apiProvider) || apiProviderItems[0];
+        }
+
         if (!w2ui.translationPrompt)
         {
             $().w2form({
                 name: 'translationPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0">'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Source Lcid:</label>'+
-                    '        <div>'+
-                    '           <input name="sourceLcid" type="list"/>'+
-                    '        </div>'+
+                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 110px; white-space: nowrap;">Source Lcid: <span style="color: red;">*</span></label>'+
+                    '        <input name="sourceLcid" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Target Lcid:</label>'+
-                    '        <div>'+
-                    '            <input name="targetLcid" type="list"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 110px; white-space: nowrap;">Target Lcid: <span style="color: red;">*</span></label>'+
+                    '        <input name="targetLcid" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>Translate All:</label>'+
-                    '        <div>'+
-                    '            <input name="translateMissing" type="list"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 110px; white-space: nowrap;">Translate All:</label>'+
+                    '        <input name="translateMissing" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
-                    '    <div class="w2ui-field">'+
-                    '        <label>API Provider:</label>'+
-                    '        <div>'+
-                    '            <input name="apiProvider" type="list"/>'+
-                    '        </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 110px; white-space: nowrap;">API Provider:</label>'+
+                    '        <input name="apiProvider" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -461,15 +652,41 @@
                 fields: [
                     { field: 'targetLcid', type: 'list', required: true, options: { items: languageItems } },
                     { field: 'sourceLcid', type: 'list', required: true, options: { items: languageItems } },
-                    { field: 'translateMissing', type: 'list', required: false, options: { items: [{id: " ", text: " " }, { id: "missing", text: "All Missing" }, { id: "missingOrIdentical", text: "All Missing Or Identical"}] } },
-                    { field: 'apiProvider', type: 'list', required: false, options: { selected: { id: "auto" }, items: [{id: "auto", text: "Auto" }, { id: "deepl", text: "DeepL" }, { id: "azure", text: "Azure"}] } }
+                    { field: 'translateMissing', type: 'list', required: false, options: { items: translateMissingItems } },
+                    { field: 'apiProvider', type: 'list', required: false, options: { items: apiProviderItems } }
                 ],
+                record: savedRecord,
                 actions: {
                     "ok": function () {
                         this.validate();
                         w2popup.close();
 
-                        XrmTranslator.ShowRecordSelector("TranslationHandler.ProposeTranslations", [this.record.sourceLcid.id, this.record.targetLcid.id, this.record.translateMissing ? this.record.translateMissing.id.trim() : "", this.record.apiProvider ? this.record.apiProvider.id : ""], (XrmTranslator.GetGrid().getSelection() || []));
+                        var sourceLcid = this.record.sourceLcid.id;
+                        var targetLcid = this.record.targetLcid.id;
+                        var translateMissingVal = this.record.translateMissing ? this.record.translateMissing.id.trim() : "";
+                        var apiProviderVal = this.record.apiProvider ? this.record.apiProvider.id : "";
+
+                        SaveTranslationPrompt({
+                            sourceLcid: sourceLcid,
+                            targetLcid: targetLcid,
+                            translateMissing: translateMissingVal,
+                            apiProvider: apiProviderVal
+                        });
+
+                        var recordFilter = null;
+                        if (translateMissingVal) {
+                            recordFilter = function(record) {
+                                var targetVal = record[targetLcid] || record[String(targetLcid)];
+                                var sourceVal = record[sourceLcid] || record[String(sourceLcid)];
+                                if (translateMissingVal === "missingOrIdentical") {
+                                    return !targetVal || sourceVal === targetVal;
+                                }
+                                // "missing" - only records without target translation
+                                return !targetVal;
+                            };
+                        }
+
+                        XrmTranslator.ShowRecordSelector("TranslationHandler.ProposeTranslations", [sourceLcid, targetLcid, translateMissingVal, apiProviderVal], (XrmTranslator.GetGrid().getSelection() || []), recordFilter);
                     },
                     "cancel": function () {
                         w2popup.close();
@@ -478,10 +695,13 @@
             });
         }
         else {
-            // Columns will be different when user switches to portal content snippet or back from it, we need to make sure columns always match current grid columns
             w2ui.translationPrompt.fields[0].options.items = languageItems;
             w2ui.translationPrompt.fields[1].options.items = languageItems;
-            
+
+            if (saved) {
+                w2ui.translationPrompt.record = savedRecord;
+            }
+
             w2ui.translationPrompt.refresh();
         }
 
@@ -496,8 +716,8 @@
                 name    : 'translationPopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
                 style   : 'padding: 15px 0px 0px 0px',
-                width   : 500,
-                height  : 300,
+                width   : 650,
+                height  : 320,
                 showMax : true,
                 onToggle: function (event) {
                     $(w2ui.translationPrompt.box).hide();
@@ -510,6 +730,111 @@
                     event.onComplete = function () {
                         // specifying an onOpen handler instead is equivalent to specifying an onBeforeOpen handler, which would make this code execute too early and hence not deliver.
                         $('#w2ui-popup #form').w2render('translationPrompt');
+                    }
+                }
+            });
+        });
+    }
+
+    function MaskApiKey(key) {
+        if (!key || key.length <= 5) return key || "";
+        return key.substring(0, 5) + new Array(key.length - 4).join('*');
+    }
+
+    function InitializeGeminiSettingsForm() {
+        var config = GetGeminiConfig();
+        var maskedKey = MaskApiKey(config.apiKey);
+
+        if (!w2ui.geminiSettings) {
+            $().w2form({
+                name: 'geminiSettings',
+                style: 'border: 0px; background-color: transparent;',
+                formHTML:
+                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
+                    '        <input name="apiKey" type="password" style="flex: 1; width: 100%;"/>'+
+                    '    </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
+                    '        <input name="modelName" type="text" style="flex: 1; width: 100%;"/>'+
+                    '    </div>'+
+                    '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
+                    '        <textarea name="customPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
+                    '    </div>'+
+                    '</div>'+
+                    '<div class="w2ui-buttons">'+
+                    '    <button class="w2ui-btn" name="cancel">Cancel</button>'+
+                    '    <button class="w2ui-btn" name="save">Save</button>'+
+                    '</div>',
+                fields: [
+                    { field: 'apiKey', type: 'text', required: true },
+                    { field: 'modelName', type: 'text', required: true },
+                    { field: 'customPrompt', type: 'text', required: false }
+                ],
+                record: {
+                    apiKey: maskedKey,
+                    modelName: config.modelName || "gemini-2.0-flash",
+                    customPrompt: config.customPrompt || ""
+                },
+                actions: {
+                    "save": function () {
+                        if (this.validate().length > 0) {
+                            return;
+                        }
+                        var currentConfig = GetGeminiConfig();
+                        var apiKeyToSave = this.record.apiKey;
+                        if (apiKeyToSave.indexOf("*") !== -1 && currentConfig && currentConfig.apiKey) {
+                            apiKeyToSave = currentConfig.apiKey;
+                        }
+                        SaveGeminiConfig({
+                            apiKey: apiKeyToSave,
+                            modelName: this.record.modelName,
+                            customPrompt: this.record.customPrompt
+                        });
+                        w2popup.close();
+                        w2alert("Gemini settings saved successfully.");
+                    },
+                    "cancel": function () {
+                        w2popup.close();
+                    }
+                }
+            });
+        }
+        else {
+            w2ui.geminiSettings.record = {
+                apiKey: maskedKey,
+                modelName: config.modelName || "gemini-2.0-flash",
+                customPrompt: config.customPrompt || ""
+            };
+            w2ui.geminiSettings.refresh();
+        }
+
+        return Promise.resolve({});
+    }
+
+    TranslationHandler.ShowGeminiSettings = function() {
+        InitializeGeminiSettingsForm()
+        .then(function() {
+            $().w2popup('open', {
+                title   : 'Gemini AI Translation Settings',
+                name    : 'geminiSettingsPopup',
+                body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
+                style   : 'padding: 15px 0px 0px 0px',
+                width   : 650,
+                height  : 350,
+                showMax : true,
+                onToggle: function (event) {
+                    $(w2ui.geminiSettings.box).hide();
+                    event.onComplete = function () {
+                        $(w2ui.geminiSettings.box).show();
+                        w2ui.geminiSettings.resize();
+                    }
+                },
+                onOpen: function (event) {
+                    event.onComplete = function () {
+                        $('#w2ui-popup #form').w2render('geminiSettings');
                     }
                 }
             });
