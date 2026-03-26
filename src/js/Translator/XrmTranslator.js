@@ -688,17 +688,34 @@
 
         var baseLang = XrmTranslator.baseLanguage ? XrmTranslator.baseLanguage.toString() : null;
         if (baseLang) {
-            allRecords.forEach(function(r) {
-                r.sourceText = r[baseLang] || '';
-                if (r.w2ui && r.w2ui.children) {
-                    r.w2ui.children.forEach(function(c) {
-                        c.sourceText = c[baseLang] || '';
+            var setSourceTextRecursive = function(record, lang) {
+                record.sourceText = record[lang] || '';
+                if (record.w2ui && Array.isArray(record.w2ui.children)) {
+                    record.w2ui.children.forEach(function(child) {
+                        setSourceTextRecursive(child, lang);
                     });
                 }
+            };
+            allRecords.forEach(function(r) {
+                setSourceTextRecursive(r, baseLang);
             });
         }
 
-        var filteredRecords = recordFilter ? allRecords.filter(recordFilter) : allRecords;
+        var filteredRecords;
+        if (recordFilter) {
+            var filterRecursive = function(records) {
+                return records.filter(function(r) {
+                    if (r.w2ui && Array.isArray(r.w2ui.children)) {
+                        r.w2ui.children = filterRecursive(r.w2ui.children);
+                        if (r.w2ui.children.length > 0) return true;
+                    }
+                    return recordFilter(r);
+                });
+            };
+            filteredRecords = filterRecursive(allRecords);
+        } else {
+            filteredRecords = allRecords;
+        }
 
         if (recordFilter && filteredRecords.length === 0) {
             w2alert("No matching records found. All records already have translations for the target language.");

@@ -276,6 +276,12 @@
                 data: JSON.stringify(requestBody)
             }))
             .then(function(response) {
+                if (!response || !response.candidates || !response.candidates[0] ||
+                    !response.candidates[0].content || !response.candidates[0].content.parts ||
+                    !response.candidates[0].content.parts[0] || !response.candidates[0].content.parts[0].text) {
+                    var errorMsg = (response && response.error && response.error.message) || "No translation returned";
+                    throw new Error("Gemini API error: " + errorMsg);
+                }
                 var text = response.candidates[0].content.parts[0].text;
                 text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
 
@@ -464,7 +470,7 @@
 
         if (!translator) {
             XrmTranslator.UnlockGrid();
-            return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, authProvider  + ": Found not supported or missing API Provider, please set one in the config web resource (currently only 'deepl' and 'azure' are supported")]);
+            return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, authProvider  + ": Found not supported or missing API Provider, please set one in the config web resource (currently only 'deepl', 'azure' and 'gemini' are supported)")]);
         }
 
         return translator.CanTranslate(fromLcid, destLcid)
@@ -747,7 +753,7 @@
                     '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
                     '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
                     '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
-                    '        <input name="apiKey" type="text" style="flex: 1; width: 100%;"/>'+
+                    '        <input name="apiKey" type="password" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
                     '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
                     '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
@@ -779,7 +785,7 @@
                         }
                         var currentConfig = GetGeminiConfig();
                         var apiKeyToSave = this.record.apiKey;
-                        if (apiKeyToSave === MaskApiKey(currentConfig.apiKey)) {
+                        if (apiKeyToSave.indexOf("*") !== -1 && currentConfig && currentConfig.apiKey) {
                             apiKeyToSave = currentConfig.apiKey;
                         }
                         SaveGeminiConfig({
