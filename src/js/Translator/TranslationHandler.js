@@ -27,6 +27,20 @@
     
     var locales = null;
     var GEMINI_CONFIG_KEY = "XrmQuickEdit_GeminiConfig";
+    var TRANSLATION_PROMPT_KEY = "XrmQuickEdit_TranslationPrompt";
+
+    function GetSavedTranslationPrompt() {
+        try {
+            var stored = localStorage.getItem(TRANSLATION_PROMPT_KEY);
+            return stored ? JSON.parse(stored) : null;
+        } catch(e) {
+            return null;
+        }
+    }
+
+    function SaveTranslationPrompt(values) {
+        localStorage.setItem(TRANSLATION_PROMPT_KEY, JSON.stringify(values));
+    }
 
     function GetGeminiConfig() {
         try {
@@ -628,6 +642,28 @@
             languageItems.push({ id: availableLanguages[i].field, text: availableLanguages[i].caption });
         }
 
+        var saved = GetSavedTranslationPrompt();
+        var translateMissingItems = [{id: " ", text: " " }, { id: "missing", text: "All Missing" }, { id: "missingOrIdentical", text: "All Missing Or Identical"}];
+        var apiProviderItems = [{id: "auto", text: "Auto" }, { id: "deepl", text: "DeepL" }, { id: "azure", text: "Azure"}, { id: "gemini", text: "Gemini AI"}];
+
+        function findItem(items, id) {
+            if (!id) return null;
+            for (var i = 0; i < items.length; i++) {
+                if (String(items[i].id) === String(id)) return items[i];
+            }
+            return null;
+        }
+
+        var savedRecord = {};
+        if (saved) {
+            var srcItem = findItem(languageItems, saved.sourceLcid);
+            var tgtItem = findItem(languageItems, saved.targetLcid);
+            if (srcItem) savedRecord.sourceLcid = srcItem;
+            if (tgtItem) savedRecord.targetLcid = tgtItem;
+            savedRecord.translateMissing = findItem(translateMissingItems, saved.translateMissing) || translateMissingItems[0];
+            savedRecord.apiProvider = findItem(apiProviderItems, saved.apiProvider) || apiProviderItems[0];
+        }
+
         if (!w2ui.translationPrompt)
         {
             $().w2form({
@@ -667,9 +703,10 @@
                 fields: [
                     { field: 'targetLcid', type: 'list', required: true, options: { items: languageItems } },
                     { field: 'sourceLcid', type: 'list', required: true, options: { items: languageItems } },
-                    { field: 'translateMissing', type: 'list', required: false, options: { items: [{id: " ", text: " " }, { id: "missing", text: "All Missing" }, { id: "missingOrIdentical", text: "All Missing Or Identical"}] } },
-                    { field: 'apiProvider', type: 'list', required: false, options: { selected: { id: "auto" }, items: [{id: "auto", text: "Auto" }, { id: "deepl", text: "DeepL" }, { id: "azure", text: "Azure"}, { id: "gemini", text: "Gemini AI"}] } }
+                    { field: 'translateMissing', type: 'list', required: false, options: { items: translateMissingItems } },
+                    { field: 'apiProvider', type: 'list', required: false, options: { items: apiProviderItems } }
                 ],
+                record: savedRecord,
                 actions: {
                     "ok": function () {
                         this.validate();
@@ -679,6 +716,13 @@
                         var targetLcid = this.record.targetLcid.id;
                         var translateMissingVal = this.record.translateMissing ? this.record.translateMissing.id.trim() : "";
                         var apiProviderVal = this.record.apiProvider ? this.record.apiProvider.id : "";
+
+                        SaveTranslationPrompt({
+                            sourceLcid: sourceLcid,
+                            targetLcid: targetLcid,
+                            translateMissing: translateMissingVal,
+                            apiProvider: apiProviderVal
+                        });
 
                         var recordFilter = null;
                         if (translateMissingVal) {
@@ -703,10 +747,13 @@
             });
         }
         else {
-            // Columns will be different when user switches to portal content snippet or back from it, we need to make sure columns always match current grid columns
             w2ui.translationPrompt.fields[0].options.items = languageItems;
             w2ui.translationPrompt.fields[1].options.items = languageItems;
-            
+
+            if (saved) {
+                w2ui.translationPrompt.record = savedRecord;
+            }
+
             w2ui.translationPrompt.refresh();
         }
 

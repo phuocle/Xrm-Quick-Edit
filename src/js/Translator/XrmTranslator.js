@@ -45,7 +45,10 @@
 
     XrmTranslator.defaultSchemaNameSize = "20%";
 
+    XrmTranslator.allEntities = [];
+
     var currentHandler = null;
+    var solutionEntityCache = {};
 
     RegExp.escape= function(s) {
         return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -142,6 +145,10 @@
         CustomControl: 66,
         CustomControlDefaultConfig: 68,
     };
+
+    XrmTranslator.GetSolution = function() {
+        return w2ui.grid_toolbar.get("solutionSelect").selected;
+    }
 
     XrmTranslator.GetEntity = function() {
         return w2ui.grid_toolbar.get("entitySelect").selected;
@@ -634,7 +641,8 @@
                 show: { selectColumn: true },
                 multiSelect: true,
                 columns: [
-                    { field: 'schemaName', caption: 'Schema Name', size: '100%', sortable: true, searchable: true }
+                    { field: 'schemaName', caption: 'Schema Name', size: '30%', sortable: true, searchable: true },
+                    { field: 'sourceText', caption: 'Source Text', size: '70%', sortable: true, searchable: true }
                 ],
                 records: [],
                 onSelect: function(event) {
@@ -676,6 +684,19 @@
         w2ui.recordSelectorGrid.reset(true);
         w2ui.recordSelectorGrid.clear();
         var allRecords = JSON.parse(JSON.stringify(XrmTranslator.GetGrid().records)).map(removeHideCheckBoxFlag);
+
+        var baseLang = XrmTranslator.baseLanguage ? XrmTranslator.baseLanguage.toString() : null;
+        if (baseLang) {
+            allRecords.forEach(function(r) {
+                r.sourceText = r[baseLang] || '';
+                if (r.w2ui && r.w2ui.children) {
+                    r.w2ui.children.forEach(function(c) {
+                        c.sourceText = c[baseLang] || '';
+                    });
+                }
+            });
+        }
+
         var filteredRecords = recordFilter ? allRecords.filter(recordFilter) : allRecords;
 
         if (recordFilter && filteredRecords.length === 0) {
@@ -1050,6 +1071,20 @@
 
     function InitializeGrid (entities) {
         var items = [
+            { type: 'menu-radio', id: 'solutionSelect', img: 'icon-folder',
+                text: function (item) {
+                    var el = this.get('solutionSelect:' + item.selected);
+                    if (el) {
+                        return 'Solution: ' + el.text;
+                    }
+                    return 'Choose solution';
+                },
+                selected: 'all',
+                items: [
+                    { id: 'all', text: 'Default Solution' },
+                    { text: '--' }
+                ]
+            },
             { type: 'menu-radio', id: 'entitySelect', img: 'icon-folder',
                 text: function (item) {
                     var text = item.selected;
@@ -1165,6 +1200,11 @@
                 onClick: function (event) {
                     var target = event.target;
 
+                    if (target.startsWith("solutionSelect:")) {
+                        var selectedSolutionId = target.replace("solutionSelect:", "");
+                        RepopulateEntitySelector(selectedSolutionId);
+                    }
+
                     if (target.startsWith("entitySelect:")) {
                         if (target === "entitySelect:none") { //None click
                             w2ui['grid_toolbar'].disable('type:attributes');
@@ -1246,13 +1286,81 @@
 
     function GetEntities() {
         var queryParams = "?$select=SchemaName,LogicalName,MetadataId,DisplayName&$filter=IsCustomizable/Value eq true";
-        
+
         var request = {
             entityName: "EntityDefinition",
             queryParams: queryParams
         };
 
         return WebApiClient.Retrieve(request);
+    }
+
+    function GetSolutions() {
+        return WebApiClient.Retrieve({
+            entityName: "solution",
+            queryParams: "?$select=uniquename,friendlyname,solutionid&$filter=ismanaged eq false and isvisible eq true and uniquename ne 'Default'&$orderby=friendlyname asc"
+        });
+    }
+
+    function FillSolutionSelector(solutions) {
+        var solutionSelect = w2ui.grid_toolbar.get("solutionSelect").items;
+
+        for (var i = 0; i < solutions.length; i++) {
+            var solution = solutions[i];
+            solutionSelect.push({
+                id: solution.solutionid,
+                text: solution.friendlyname + " (" + solution.uniquename + ")"
+            });
+        }
+
+        return solutions;
+    }
+
+    function GetSolutionEntities(solutionId) {
+        if (solutionEntityCache[solutionId]) {
+            return Promise.resolve(solutionEntityCache[solutionId]);
+        }
+
+        return WebApiClient.Retrieve({
+            entityName: "solutioncomponent",
+            queryParams: "?$select=objectid&$filter=_solutionid_value eq " + solutionId + " and componenttype eq 1"
+        })
+        .then(function(response) {
+            var metadataIds = response.value.map(function(c) {
+                return c.objectid.toLowerCase();
+            });
+            solutionEntityCache[solutionId] = metadataIds;
+            return metadataIds;
+        });
+    }
+
+    function RepopulateEntitySelector(solutionId) {
+        var entitySelectItem = w2ui.grid_toolbar.get("entitySelect");
+        entitySelectItem.selected = "none";
+        entitySelectItem.items = [
+            { id: 'none', text: 'None' },
+            { text: '--' }
+        ];
+        XrmTranslator.entityMetadata = {};
+
+        if (!solutionId || solutionId === 'all') {
+            FillEntitySelector(XrmTranslator.allEntities);
+            w2ui.grid_toolbar.refresh();
+            return Promise.resolve();
+        }
+
+        XrmTranslator.LockGrid("Loading solution entities...");
+
+        return GetSolutionEntities(solutionId)
+        .then(function(metadataIds) {
+            var solutionEntities = XrmTranslator.allEntities.filter(function(e) {
+                return metadataIds.indexOf(e.MetadataId.toLowerCase()) !== -1;
+            });
+            FillEntitySelector(solutionEntities);
+            w2ui.grid_toolbar.refresh();
+            XrmTranslator.UnlockGrid();
+        })
+        .catch(XrmTranslator.errorHandler);
     }
 
     function GetUserId() {
@@ -1390,10 +1498,16 @@
         .then(function (response) {
             XrmTranslator.userSettings = response;
 
-            return GetEntities();
+            return Promise.all([GetEntities(), GetSolutions()]);
         })
-        .then(function(response) {
-            return FillEntitySelector(response.value);
+        .then(function(results) {
+            var entities = results[0].value;
+            var solutions = results[1].value;
+
+            XrmTranslator.allEntities = entities;
+
+            FillSolutionSelector(solutions);
+            return FillEntitySelector(entities);
         })
         .then(function () {
             return TranslationHandler.GetAvailableLanguages();
