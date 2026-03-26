@@ -194,6 +194,9 @@
         else if (XrmTranslator.GetType() === "charts") {
             currentHandler = ChartHandler;
         }
+        else if (XrmTranslator.GetType() === "bpf") {
+            currentHandler = BpfHandler;
+        }
         else if (XrmTranslator.GetType() === "content") {
             w2ui.grid.show.selectColumn = true;
             currentHandler = ContentSnippetHandler;
@@ -1124,6 +1127,7 @@
                     { id: 'formMeta', text: 'Form Metadata', icon: 'fa-picture' },
                     { id: 'entityMeta', text: 'Entity Metadata', icon: 'fa-picture' },
                     { id: 'charts', text: 'Charts', icon: 'fa-picture' },
+                    { id: 'bpf', text: 'Business Process Flows', icon: 'fa-picture' },
                     { id: 'content', text: 'Content', icon: 'fa-picture' },
                     { id: 'dashboards', text: 'Dashboards', icon: 'fa-picture' },
                     { id: 'webresources', text: 'Web Resources', icon: 'fa-picture' }
@@ -1165,6 +1169,7 @@
                         w2ui['filterbar'].disable('type:content');
                         w2ui['filterbar'].disable('type:forms');
                         w2ui['filterbar'].disable('type:formMeta');
+                        w2ui['filterbar'].disable('type:bpf');
 
                         w2ui['filterbar'].enable('type:webresources');
                         w2ui['filterbar'].enable('type:dashboards');
@@ -1177,6 +1182,7 @@
                         w2ui['filterbar'].enable('type:charts');
                         w2ui['filterbar'].enable('type:forms');
                         w2ui['filterbar'].enable('type:formMeta');
+                        w2ui['filterbar'].enable('type:bpf');
 
                         w2ui['filterbar'].disable('type:webresources');
                         w2ui['filterbar'].disable('type:dashboards');
