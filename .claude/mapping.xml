@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Mapping SolutionName="XrmQuickEdit">
+  <!-- CSS -->
+  <File LocalPath="src/lib/w2ui-1.5.rc1.min.css" UniqueName="oss_/XrmQuickEdit/css/w2ui.css" />
+
+  <!-- HTML -->
+  <File LocalPath="src/html/PropertyEditorGrid.html" UniqueName="oss_/XrmQuickEdit/html/PropertyEditorGrid.html" />
+  <File LocalPath="src/html/TranslationGrid.html" UniqueName="oss_/XrmQuickEdit/html/TranslationGrid.html" />
+
+  <!-- JS - PropertyEditor -->
+  <File LocalPath="src/js/PropertyEditor/AttributePropertyHandler.js" UniqueName="oss_/XrmQuickEdit/js/AttributePropertyHandler.js" />
+  <File LocalPath="src/js/PropertyEditor/EntityPropertyHandler.js" UniqueName="oss_/XrmQuickEdit/js/EntityPropertyHandler.js" />
+  <File LocalPath="src/js/PropertyEditor/XrmPropertyEditor.js" UniqueName="oss_/XrmQuickEdit/js/XrmPropertyEditor.js" />
+
+  <!-- JS - Translator -->
+  <File LocalPath="src/js/Translator/AttributeHandler.js" UniqueName="oss_/XrmQuickEdit/js/AttributeHandler.js" />
+  <File LocalPath="src/js/Translator/ChartHandler.js" UniqueName="oss_/XrmQuickEdit/js/ChartHandler.js" />
+  <File LocalPath="src/js/Translator/ContentSnippetHandler.js" UniqueName="oss_/XrmQuickEdit/js/ContentSnippetHandler.js" />
+  <File LocalPath="src/js/Translator/EntityHandler.js" UniqueName="oss_/XrmQuickEdit/js/EntityHandler.js" />
+  <File LocalPath="src/js/Translator/FormHandler.js" UniqueName="oss_/XrmQuickEdit/js/FormHandler.js" />
+  <File LocalPath="src/js/Translator/FormMetaHandler.js" UniqueName="oss_/XrmQuickEdit/js/FormMetaHandler.js" />
+  <File LocalPath="src/js/Translator/OptionSetHandler.js" UniqueName="oss_/XrmQuickEdit/js/OptionSetHandler.js" />
+  <File LocalPath="src/js/Translator/TranslationHandler.js" UniqueName="oss_/XrmQuickEdit/js/TranslationHandler.js" />
+  <File LocalPath="src/js/Translator/ViewHandler.js" UniqueName="oss_/XrmQuickEdit/js/ViewHandler.js" />
+  <File LocalPath="src/js/Translator/WebResourceHandler.js" UniqueName="oss_/XrmQuickEdit/js/WebResourceHandler.js" />
+  <File LocalPath="src/js/Translator/XrmTranslator.js" UniqueName="oss_/XrmQuickEdit/js/XrmTranslator.js" />
+
+  <!-- JS - Libraries -->
+  <File LocalPath="src/lib/jquery.min.js" UniqueName="oss_/XrmQuickEdit/js/jQuery.js" />
+  <File LocalPath="src/lib/w2ui-1.5.rc1.min.js" UniqueName="oss_/XrmQuickEdit/js/w2ui.js" />
+
+  <!-- No local file found for these CRM web resources:
+    oss_/XrmQuickEdit/config/XrmQuickEditConfig.js
+    oss_/XrmQuickEdit/js/WebApiClient.js
+  -->
+</Mapping>
