@@ -788,8 +788,14 @@
         });
     }
 
+    function MaskApiKey(key) {
+        if (!key || key.length <= 5) return key || "";
+        return key.substring(0, 5) + new Array(key.length - 4).join('*');
+    }
+
     function InitializeGeminiSettingsForm() {
         var config = GetGeminiConfig();
+        var maskedKey = MaskApiKey(config.apiKey);
 
         if (!w2ui.geminiSettings) {
             $().w2form({
@@ -826,7 +832,7 @@
                     { field: 'customPrompt', type: 'text', required: false }
                 ],
                 record: {
-                    apiKey: config.apiKey || "",
+                    apiKey: maskedKey,
                     modelName: config.modelName || "gemini-2.0-flash",
                     customPrompt: config.customPrompt || ""
                 },
@@ -835,8 +841,13 @@
                         if (this.validate().length > 0) {
                             return;
                         }
+                        var currentConfig = GetGeminiConfig();
+                        var apiKeyToSave = this.record.apiKey;
+                        if (apiKeyToSave === MaskApiKey(currentConfig.apiKey)) {
+                            apiKeyToSave = currentConfig.apiKey;
+                        }
                         SaveGeminiConfig({
-                            apiKey: this.record.apiKey,
+                            apiKey: apiKeyToSave,
                             modelName: this.record.modelName,
                             customPrompt: this.record.customPrompt
                         });
@@ -851,7 +862,7 @@
         }
         else {
             w2ui.geminiSettings.record = {
-                apiKey: config.apiKey || "",
+                apiKey: maskedKey,
                 modelName: config.modelName || "gemini-2.0-flash",
                 customPrompt: config.customPrompt || ""
             };
