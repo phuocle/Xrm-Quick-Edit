@@ -627,7 +627,7 @@
         return r;
     }
 
-    XrmTranslator.ShowRecordSelector = function (callbackName, callbackParameters, preselectedRecords) {
+    XrmTranslator.ShowRecordSelector = function (callbackName, callbackParameters, preselectedRecords, recordFilter) {
         if (!w2ui.recordSelectorGrid) {
             var grid = {
                 name: 'recordSelectorGrid',
@@ -675,7 +675,15 @@
 
         w2ui.recordSelectorGrid.reset(true);
         w2ui.recordSelectorGrid.clear();
-        w2ui.recordSelectorGrid.add(JSON.parse(JSON.stringify(XrmTranslator.GetGrid().records)).map(removeHideCheckBoxFlag));
+        var allRecords = JSON.parse(JSON.stringify(XrmTranslator.GetGrid().records)).map(removeHideCheckBoxFlag);
+        var filteredRecords = recordFilter ? allRecords.filter(recordFilter) : allRecords;
+
+        if (recordFilter && filteredRecords.length === 0) {
+            w2alert("No matching records found. All records already have translations for the target language.");
+            return;
+        }
+
+        w2ui.recordSelectorGrid.add(filteredRecords);
         w2ui.recordSelectorGrid.refresh();
 
         var callbackString = (callbackParameters || []).map(function(p) { return typeof(p) === "string" ? "'" + p + "'" : p + ""; }).join(",");
@@ -1103,6 +1111,10 @@
                 TranslationHandler.ShowTranslationPrompt();
             } });
         }
+
+        items.push({ type: 'button', id: 'geminiSettings', text: 'Gemini Settings', img:'icon-page', onClick: function (event) {
+            TranslationHandler.ShowGeminiSettings();
+        } });
 
         if (XrmTranslator.config.enableLocking) {
             items.push({ type: 'menu-radio', id: 'lockOrUnlock', img: 'w2ui-icon-cross',
