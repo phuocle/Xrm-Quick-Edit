@@ -424,13 +424,9 @@
     }
 
     function FindTranslator(authKey, authProvider, region, fromLcid, destLcid, apiProvider, preFallBackError) {
-        console.log("[FindTranslator] START", { authProvider: authProvider, apiProvider: apiProvider, fromLcid: fromLcid, destLcid: destLcid, hasAuthKey: !!authKey, region: region, preFallBackError: preFallBackError });
-
         // When user explicitly selected gemini, handle it directly regardless of config provider
         if (apiProvider === "gemini") {
-            console.log("[FindTranslator] User explicitly selected Gemini, handling directly");
             var geminiConfig = GetGeminiConfig();
-            console.log("[FindTranslator] Gemini config:", { hasApiKey: !!(geminiConfig && geminiConfig.apiKey), modelName: geminiConfig ? geminiConfig.modelName : "N/A" });
             if (!geminiConfig || !geminiConfig.apiKey) {
                 XrmTranslator.UnlockGrid();
                 return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, "Gemini: API Key is missing. Please configure it via the Gemini Settings button.")]);
@@ -438,19 +434,16 @@
             var translator = CreateTranslator("gemini");
             return translator.CanTranslate(fromLcid, destLcid)
             .then(function(canTranslate) {
-                console.log("[FindTranslator] Gemini CanTranslate result:", canTranslate);
                 return [translator];
             });
         }
 
         if(apiProvider !== "auto" && (authProvider ||"").trim().toLowerCase() !== apiProvider) {
-            console.log("[FindTranslator] Provider mismatch, skipping. authProvider:", authProvider, "apiProvider:", apiProvider);
             return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, "")]);
         }
 
         if ((authProvider || "").trim().toLowerCase() === "gemini") {
             var geminiConfig = GetGeminiConfig();
-            console.log("[FindTranslator] Gemini provider detected. Config:", { hasApiKey: !!(geminiConfig && geminiConfig.apiKey), modelName: geminiConfig ? geminiConfig.modelName : "N/A" });
             if (!geminiConfig || !geminiConfig.apiKey) {
                 XrmTranslator.UnlockGrid();
                 return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, "Gemini: API Key is missing. Please configure it via the Gemini Settings button.")]);
@@ -458,13 +451,11 @@
             var translator = CreateTranslator("gemini");
             return translator.CanTranslate(fromLcid, destLcid)
             .then(function(canTranslate) {
-                console.log("[FindTranslator] Gemini CanTranslate result:", canTranslate);
                 return [translator];
             });
         }
 
         if (!authKey) {
-            console.log("[FindTranslator] No authKey for provider:", authProvider);
             XrmTranslator.UnlockGrid();
             return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, authProvider + ": Auth Key is missing, please add one in the config web resource")]);
         }
@@ -472,29 +463,23 @@
         var translator = CreateTranslator(authProvider, authKey, region);
 
         if (!translator) {
-            console.log("[FindTranslator] CreateTranslator returned null for provider:", authProvider);
             XrmTranslator.UnlockGrid();
             return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, authProvider  + ": Found not supported or missing API Provider, please set one in the config web resource (currently only 'deepl' and 'azure' are supported")]);
         }
 
-        console.log("[FindTranslator] Checking CanTranslate for:", authProvider);
         return translator.CanTranslate(fromLcid, destLcid)
         .then(function(canTranslate) {
-            console.log("[FindTranslator] CanTranslate result:", canTranslate);
             if (canTranslate[fromLcid] && canTranslate[destLcid]) {
-                console.log("[FindTranslator] Translator found successfully:", authProvider);
                 return [translator];
             }
 
             const errorMsg = BuildError(preFallBackError, authProvider + " translator does not support the current languages: " + fromLcid + "(" + canTranslate[fromLcid] + "), " + destLcid + "(" + canTranslate[destLcid] + ")");
-            console.log("[FindTranslator] Language not supported, error:", errorMsg);
 
             return [null, errorMsg];
         })
     }
 
     TranslationHandler.ProposeTranslations = function(recordsRaw, fromLcid, destLcid, translateMissing, apiProvider) {
-        console.log("[ProposeTranslations] START", { fromLcid: fromLcid, destLcid: destLcid, translateMissing: translateMissing, apiProvider: apiProvider, totalRecords: recordsRaw ? recordsRaw.length : 0 });
         XrmTranslator.LockGrid("Translating...");
 
         var records = !translateMissing
@@ -508,12 +493,8 @@
                 return true;
             });
 
-        console.log("[ProposeTranslations] After filter: " + records.length + " records to translate (from " + recordsRaw.length + " raw)");
-
         var fromIso = GetLanguageIsoByLcid(fromLcid);
         var toIso = GetLanguageIsoByLcid(destLcid);
-
-        console.log("[ProposeTranslations] Language mapping: fromLcid=" + fromLcid + " -> fromIso=" + fromIso + ", destLcid=" + destLcid + " -> toIso=" + toIso);
 
         if (!fromIso || !toIso) {
             XrmTranslator.UnlockGrid();
@@ -523,30 +504,18 @@
             return;
         }
 
-        console.log("[ProposeTranslations] Config:", {
-            translationApiProvider: XrmTranslator.config.translationApiProvider,
-            hasTranslationApiKey: !!XrmTranslator.config.translationApiKey,
-            translationApiRegion: XrmTranslator.config.translationApiRegion,
-            translationApiProviderFallback: XrmTranslator.config.translationApiProviderFallback,
-            hasTranslationApiKeyFallback: !!XrmTranslator.config.translationApiKeyFallback
-        });
-
         FindTranslator(XrmTranslator.config.translationApiKey, XrmTranslator.config.translationApiProvider, XrmTranslator.config.translationApiRegion, fromIso, toIso, apiProvider)
         .then(function (result) {
-            console.log("[ProposeTranslations] FindTranslator primary result:", { hasTranslator: !!result[0], errorMessage: result[1] || "(none)" });
             if (!result[0] && XrmTranslator.config.translationApiProviderFallback) {
-                console.log("[ProposeTranslations] Trying fallback provider:", XrmTranslator.config.translationApiProviderFallback);
                 return FindTranslator(XrmTranslator.config.translationApiKeyFallback, XrmTranslator.config.translationApiProviderFallback, XrmTranslator.config.translationApiRegionFallback, fromIso, toIso, apiProvider, result[1])
             }
             return result;
         })
         .then(function(result) {
-            console.log("[ProposeTranslations] Final translator result:", { hasTranslator: !!result[0], errorMessage: result[1] || "(none)" });
             var translator = result[0];
 
             if (!translator) {
                 var errorMsg = result[1] || "(No error message returned - check config)";
-                console.error("[ProposeTranslations] No translator found! Error:", errorMsg);
                 XrmTranslator.UnlockGrid();
                 w2alert(errorMsg);
                 return null;
@@ -565,10 +534,7 @@
                 updateRecords.push(record);
             }
 
-            console.log("[ProposeTranslations] Records with source text: " + updateRecords.length);
-
             if (updateRecords.length === 0) {
-                console.warn("[ProposeTranslations] No records to translate (all source texts empty)");
                 XrmTranslator.UnlockGrid();
                 w2alert("No records to translate. All selected records have empty source text for the source language.");
                 return null;
@@ -580,14 +546,9 @@
                     return w2utils.decodeTags(record[fromLcid]);
                 });
 
-                console.log("[ProposeTranslations] Using BATCH mode (Gemini). Phrases count:", phrases.length);
-                debugger; // << DEBUGGER: Before Gemini batch call
-
                 return translator.GetBatchTranslations(fromIso, toIso, phrases)
                 .then(function(translatedPhrases) {
-                    console.log("[ProposeTranslations] Batch translation SUCCESS. Translated count:", translatedPhrases ? translatedPhrases.length : 0);
                     var results = translator.AddTranslations(fromLcid, destLcid, updateRecords, translatedPhrases);
-                    console.log("[ProposeTranslations] Translation results to show:", results ? results.length : 0);
                     ShowTranslationResults(results);
                     XrmTranslator.UnlockGrid();
                 });
@@ -608,24 +569,14 @@
                 translationRequests.push(translator.GetTranslation(fromIso, toIso, w2utils.decodeTags(source)));
             }
 
-            console.log("[ProposeTranslations] Using PER-PHRASE mode. Requests count:", translationRequests.length);
-            debugger; // << DEBUGGER: Before DeepL/Azure calls
-
             return WebApiClient.Promise.all(translationRequests)
             .then(function (responses) {
-                console.log("[ProposeTranslations] Per-phrase translation SUCCESS. Responses count:", responses ? responses.length : 0);
                 var results = translator.AddTranslations(fromLcid, destLcid, updateRecords, responses);
-                console.log("[ProposeTranslations] Translation results to show:", results ? results.length : 0);
                 ShowTranslationResults(results);
                 XrmTranslator.UnlockGrid();
             });
         })
         .catch(function(error) {
-            console.error("[ProposeTranslations] CAUGHT ERROR:", error);
-            console.error("[ProposeTranslations] Error details:", JSON.stringify(error, null, 2));
-            if (error && error.stack) {
-                console.error("[ProposeTranslations] Stack trace:", error.stack);
-            }
             XrmTranslator.errorHandler(error);
         });
     }
@@ -735,7 +686,6 @@
                                 // "missing" - only records without target translation
                                 return !targetVal;
                             };
-                            console.log("[RecordFilter] translateMissing:", translateMissingVal, "targetLcid:", targetLcid, "(type:", typeof targetLcid + ")");
                         }
 
                         XrmTranslator.ShowRecordSelector("TranslationHandler.ProposeTranslations", [sourceLcid, targetLcid, translateMissingVal, apiProviderVal], (XrmTranslator.GetGrid().getSelection() || []), recordFilter);
