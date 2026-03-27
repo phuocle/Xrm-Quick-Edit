@@ -50,7 +50,7 @@ If no mapping is found, tell the user:
 Run the following command and WAIT for it to complete (do NOT run in background):
 
 ```
-devkit webresource --auth <DEVKIT_AUTH_TYPE> --url <DEVKIT_URL> --clientid <DEVKIT_CLIENT_ID> --clientsecret "<DEVKIT_CLIENT_SECRET>" -f "$ARGUMENTS" -w "<UniqueName>"
+devkit webresource --auth <DEVKIT_AUTH_TYPE> --url <DEVKIT_URL> --clientid <DEVKIT_CLIENT_ID> --clientsecret "<DEVKIT_CLIENT_SECRET>" -f "$ARGUMENTS" -w "<UniqueName>" --plain
 ```
 
 Replace placeholders with values from `.env` (Step 3) and `<UniqueName>` from Step 4.

@@ -76,6 +76,17 @@
         return updates;
     }
 
+    var formTypeMap = {
+        0: "Dashboard",
+        2: "Main",
+        5: "Mobile Express",
+        6: "Quick View",
+        7: "Quick Create",
+        10: "App Module Main",
+        11: "Interactive Experience",
+        12: "Card Form"
+    };
+
     function FillTable () {
         var grid = XrmTranslator.GetGrid();
         grid.clear();
@@ -93,7 +104,7 @@
 
             var record = {
                recid: form.recid,
-               schemaName: "Form"
+               schemaName: formTypeMap[form.type] || ("Type " + form.type)
             };
 
             for (var j = 0; j < displayNames.length; j++) {
@@ -143,6 +154,7 @@
 
                     var prop = WebApiClient.Promise.props({
                         recid: form.formid,
+                        type: form.type,
                         labels: WebApiClient.Execute(retrieveLabelsRequest)
                     });
 

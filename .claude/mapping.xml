@@ -17,6 +17,7 @@
   <File LocalPath="src/js/Translator/BpfHandler.js" UniqueName="oss_/XrmQuickEdit/js/BpfHandler.js" />
   <File LocalPath="src/js/Translator/ChartHandler.js" UniqueName="oss_/XrmQuickEdit/js/ChartHandler.js" />
   <File LocalPath="src/js/Translator/ContentSnippetHandler.js" UniqueName="oss_/XrmQuickEdit/js/ContentSnippetHandler.js" />
+  <File LocalPath="src/js/Translator/DialogHelper.js" UniqueName="oss_/XrmQuickEdit/js/DialogHelper.js" />
   <File LocalPath="src/js/Translator/EntityHandler.js" UniqueName="oss_/XrmQuickEdit/js/EntityHandler.js" />
   <File LocalPath="src/js/Translator/FormHandler.js" UniqueName="oss_/XrmQuickEdit/js/FormHandler.js" />
   <File LocalPath="src/js/Translator/FormMetaHandler.js" UniqueName="oss_/XrmQuickEdit/js/FormMetaHandler.js" />

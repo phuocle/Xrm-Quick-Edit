@@ -400,38 +400,48 @@
             return;
         }
 
-        var formXml = GetParsedForm(XrmTranslator.metadata);
-        
-        Array.from(formXml.getElementsByTagName("cell"))
-        .forEach(function(c) {
-            const control = c.getElementsByTagName("control");
-
-            // We only want to fix overridden labels for attributes, all attribute controls have a datafieldname
-            if (!control || !control.length || !control[0].getAttribute("datafieldname")) {
+        return DialogHelper.confirm(
+            "This will remove ALL overridden attribute labels on this form and reset them to the default attribute labels. This action cannot be undone.\n\nDo you want to continue?",
+            { title: "Remove Overridden Labels" }
+        )
+        .then(function(confirmed) {
+            if (!confirmed) {
                 return;
             }
 
-            // Regenerate cell id so that MS can't find the old overridden labels
-            c.id = uuidv4();
+            var formXml = GetParsedForm(XrmTranslator.metadata);
 
-            const labels = c.getElementsByTagName("labels");
-            
-            if(labels && labels.length) {
-                const labelsNode = labels[0];
+            Array.from(formXml.getElementsByTagName("cell"))
+            .forEach(function(c) {
+                const control = c.getElementsByTagName("control");
 
-                // Remove all labels
-                Array.from(labelsNode.getElementsByTagName("label")).forEach(function(l) { labelsNode.removeChild(l); });
-            }
+                // We only want to fix overridden labels for attributes, all attribute controls have a datafieldname
+                if (!control || !control.length || !control[0].getAttribute("datafieldname")) {
+                    return;
+                }
+
+                // Regenerate cell id so that MS can't find the old overridden labels
+                c.id = uuidv4();
+
+                const labels = c.getElementsByTagName("labels");
+
+                if(labels && labels.length) {
+                    const labelsNode = labels[0];
+
+                    // Remove all labels
+                    Array.from(labelsNode.getElementsByTagName("label")).forEach(function(l) { labelsNode.removeChild(l); });
+                }
+            });
+
+            const serializer = new XMLSerializer();
+            const payload = {
+                formxml: serializer.serializeToString(formXml)
+            };
+
+            return FormHandler.Save(payload)
+            .then(function() { return DialogHelper.alert("Successfully removed all cell labels!"); })
+            .catch(function(e) { return DialogHelper.alert("Failed to remove cell labels: " + e.message, { title: "Error" }); });
         });
-        
-        const serializer = new XMLSerializer();
-        const payload = {
-            formxml: serializer.serializeToString(formXml)
-        };
-
-        return FormHandler.Save(payload)
-        .then(function() { alert("Successfully removed all cell labels!"); })
-        .catch(function(e) { alert("Failed to remove cell labels: " + e.message); });
     };
 
     FormHandler.Load = function () {

@@ -76,6 +76,26 @@
         return updates;
     }
 
+    var viewTypeMap = {
+        0: "Public",
+        1: "Advanced Find",
+        2: "Associated",
+        4: "Quick Find",
+        16: "Address Book",
+        32: "Sub Grid",
+        64: "Lookup",
+        128: "Offline Filters",
+        256: "Offline Template",
+        1024: "Saved Filters",
+        2048: "Multi-entity Lookup",
+        4096: "Custom Defined",
+        8192: "Outlook",
+        32768: "Service Appointment Book",
+        131072: "Power BI",
+        262144: "Modern Search",
+        1048576: "Copilot"
+    };
+
     function FillTable () {
         var grid = XrmTranslator.GetGrid();
         grid.clear();
@@ -93,7 +113,7 @@
 
             var record = {
                recid: view.recid,
-               schemaName: "View"
+               schemaName: viewTypeMap[view.querytype] || ("Type " + view.querytype)
             };
 
             for (var j = 0; j < displayNames.length; j++) {
@@ -142,6 +162,7 @@
 
                     var prop = WebApiClient.Promise.props({
                         recid: view.savedqueryid,
+                        querytype: view.querytype,
                         labels: WebApiClient.Execute(retrieveLabelsRequest)
                     });
 
