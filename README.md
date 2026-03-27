@@ -18,6 +18,7 @@ Translate UI labels for a wide range of CRM components directly in a grid editor
 - **Entity Names** - Entity display and collection names
 - **Charts** - Visualization display names
 - **Business Process Flows** - Stage and field labels
+- **Relationships** - Navigation menu labels for entity relationships
 - **Content Snippets** - Dynamics 365 Portals content
 - **Web Resources** - Text content within web resources
 

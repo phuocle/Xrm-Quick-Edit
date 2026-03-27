@@ -43,6 +43,7 @@ The core architectural pattern is a **handler-based module system**. Two orchest
 - `"entityMeta"` → EntityHandler
 - `"charts"` → ChartHandler
 - `"bpf"` → BpfHandler
+- `"relationships"` → RelationshipHandler
 - `"content"` → ContentSnippetHandler
 - `"webresources"` → WebResourceHandler
 

@@ -22,6 +22,7 @@
   <File LocalPath="src/js/Translator/FormHandler.js" UniqueName="oss_/XrmQuickEdit/js/FormHandler.js" />
   <File LocalPath="src/js/Translator/FormMetaHandler.js" UniqueName="oss_/XrmQuickEdit/js/FormMetaHandler.js" />
   <File LocalPath="src/js/Translator/OptionSetHandler.js" UniqueName="oss_/XrmQuickEdit/js/OptionSetHandler.js" />
+  <File LocalPath="src/js/Translator/RelationshipHandler.js" UniqueName="oss_/XrmQuickEdit/js/RelationshipHandler.js" />
   <File LocalPath="src/js/Translator/TranslationHandler.js" UniqueName="oss_/XrmQuickEdit/js/TranslationHandler.js" />
   <File LocalPath="src/js/Translator/ViewHandler.js" UniqueName="oss_/XrmQuickEdit/js/ViewHandler.js" />
   <File LocalPath="src/js/Translator/WebResourceHandler.js" UniqueName="oss_/XrmQuickEdit/js/WebResourceHandler.js" />

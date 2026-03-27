@@ -191,6 +191,9 @@
         else if (XrmTranslator.GetType() === "entityMeta") {
             currentHandler = EntityHandler;
         }
+        else if (XrmTranslator.GetType() === "relationships") {
+            currentHandler = RelationshipHandler;
+        }
         else if (XrmTranslator.GetType() === "charts") {
             currentHandler = ChartHandler;
         }
@@ -1126,6 +1129,7 @@
                     { id: 'views', text: 'Views', icon: 'fa-picture' },
                     { id: 'formMeta', text: 'Form Metadata', icon: 'fa-picture' },
                     { id: 'entityMeta', text: 'Entity Metadata', icon: 'fa-picture' },
+                    { id: 'relationships', text: 'Relationships', icon: 'fa-picture' },
                     { id: 'charts', text: 'Charts', icon: 'fa-picture' },
                     { id: 'bpf', text: 'Business Process Flows', icon: 'fa-picture' },
                     { id: 'content', text: 'Content', icon: 'fa-picture' },
@@ -1165,6 +1169,7 @@
                         w2ui['filterbar'].disable('type:options');
                         w2ui['filterbar'].disable('type:views');
                         w2ui['filterbar'].disable('type:entityMeta');
+                        w2ui['filterbar'].disable('type:relationships');
                         w2ui['filterbar'].disable('type:charts');
                         w2ui['filterbar'].disable('type:content');
                         w2ui['filterbar'].disable('type:forms');
@@ -1179,6 +1184,7 @@
                         w2ui['filterbar'].enable('type:options');
                         w2ui['filterbar'].enable('type:views');
                         w2ui['filterbar'].enable('type:entityMeta');
+                        w2ui['filterbar'].enable('type:relationships');
                         w2ui['filterbar'].enable('type:charts');
                         w2ui['filterbar'].enable('type:forms');
                         w2ui['filterbar'].enable('type:formMeta');
