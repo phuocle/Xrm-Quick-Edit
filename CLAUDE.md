@@ -12,7 +12,7 @@ Xrm Quick Edit is a Dataverse solution for Microsoft Dynamics 365 that provides 
 ```
 /deploy-web-resource <file-path>
 ```
-Uses `devkit webresource` CLI with credentials from `.env`. The file-to-web-resource mapping is defined in `.claude/mapping.xml`.
+Uses `devkit webresource` CLI (with `--plain` flag) with credentials from `.env`. The file-to-web-resource mapping is defined in `.claude/mapping.xml`.
 
 ### Export the solution
 ```
@@ -42,6 +42,7 @@ The core architectural pattern is a **handler-based module system**. Two orchest
 - `"formMeta"` → FormMetaHandler
 - `"entityMeta"` → EntityHandler
 - `"charts"` → ChartHandler
+- `"bpf"` → BpfHandler
 - `"content"` → ContentSnippetHandler
 - `"webresources"` → WebResourceHandler
 
@@ -74,6 +75,10 @@ Handlers access shared state through the `XrmTranslator` global (metadata, user 
 4. Handler calls `FillTable()` to populate the w2ui grid (columns auto-generated per installed language)
 5. User edits cells inline; w2ui tracks changes in `record.w2ui.changes`
 6. On Save: handler extracts changes → PUTs to CRM metadata API with `MSCRM.MergeLabels: true` → publishes entity
+
+### Shared Utilities
+
+**DialogHelper.js** provides Promise-based dialog methods (`alert`, `confirm`, `question`) wrapping `w2popup`. Use `DialogHelper` instead of native `alert()`/`confirm()` for consistent UI. Loaded before all handlers in both HTML dashboards.
 
 ### Translation Providers
 

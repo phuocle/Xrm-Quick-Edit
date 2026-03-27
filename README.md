@@ -17,6 +17,7 @@ Translate UI labels for a wide range of CRM components directly in a grid editor
 - **Form Names** - Form display names
 - **Entity Names** - Entity display and collection names
 - **Charts** - Visualization display names
+- **Business Process Flows** - Stage and field labels
 - **Content Snippets** - Dynamics 365 Portals content
 - **Web Resources** - Text content within web resources
 
@@ -89,7 +90,7 @@ Since v2.6.1 the tool also sets the UI language to the base language before publ
 
 ### Overridden Attribute Labels in Forms
 
-If translating an attribute doesn't update its form label, the form likely has overridden labels for that field. Use the **Remove Overridden Attribute Labels** button (available since v3.15.0) inside the form translator to clear them.
+If translating an attribute doesn't update its form label, the form likely has overridden labels for that field. Use the **Remove Overridden Attribute Labels** button (available since v3.15.0) inside the form translator to clear them. A confirmation dialog will warn you before any changes are made.
 
 > Use this at your own risk. Back up your forms by exporting them in a solution first.
 
