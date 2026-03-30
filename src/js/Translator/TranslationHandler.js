@@ -56,6 +56,27 @@
         localStorage.setItem(GEMINI_CONFIG_KEY, JSON.stringify(config));
     }
 
+    function normalizeBoolean(value, defaultValue) {
+        if (value === undefined || value === null || value === "") {
+            return defaultValue;
+        }
+
+        if (typeof value === "boolean") {
+            return value;
+        }
+
+        var normalized = String(value).trim().toLowerCase();
+        if (normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off") {
+            return false;
+        }
+
+        if (normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on") {
+            return true;
+        }
+
+        return defaultValue;
+    }
+
     TranslationHandler.GetGeminiConfig = GetGeminiConfig;
 
     function GetLanguageIsoByLcid (lcid) {
@@ -178,7 +199,8 @@
                     schemaName: record.schemaName,
                     column: destLcid,
                     source: record[fromLcid],
-                    translation: translation
+                    translation: translation,
+                    fromDictionary: false
                 });
             }
 
@@ -329,7 +351,17 @@
                     { field: 'schemaName', caption: 'Schema Name', size: '25%', sortable: true, searchable: true },
                     { field: 'column', caption: 'Column LCID', sortable: true, searchable: true, hidden: true },
                     { field: 'source', caption: 'Source Text', size: '25%', sortable: true, searchable: true },
-                    { field: 'translation', caption: 'Translated Text', size: '25%', sortable: true, searchable: true, editable: { type: 'text' } }
+                    { field: 'translation', caption: 'Translated Text', size: '25%', sortable: true, searchable: true, editable: { type: 'text' } },
+                    {
+                        field: 'fromDictionary',
+                        caption: 'From Dictionary',
+                        size: '12%',
+                        sortable: true,
+                        searchable: true,
+                        render: function (record) {
+                            return '<input type="checkbox" disabled ' + (record.fromDictionary ? 'checked' : '') + ' />';
+                        }
+                    }
                 ],
                 records: []
             };
@@ -398,8 +430,10 @@
         });
     }
 
-    TranslationHandler.ProposeTranslations = function(recordsRaw, fromLcid, destLcid, translateMissing, apiProvider) {
+    TranslationHandler.ProposeTranslations = function(recordsRaw, fromLcid, destLcid, translateMissing, apiProvider, useDictionaryFirst) {
         XrmTranslator.LockGrid("Translating...");
+
+        var useDictionaryEnabled = normalizeBoolean(useDictionaryFirst, true);
 
         function getCurrentValue(record, lcid) {
             if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, lcid)) {
@@ -475,39 +509,57 @@
                 return null;
             }
 
-            if (translator.GetBatchTranslations) {
-                var phrases = updateRecords.map(function(record) {
-                    return w2utils.decodeTags(record[fromLcid]);
-                });
+            var splitPromise = (useDictionaryEnabled && window.TranslationDictionaryService && TranslationDictionaryService.SplitRecordsByDictionary)
+                ? TranslationDictionaryService.SplitRecordsByDictionary(fromLcid, destLcid, updateRecords)
+                : Promise.resolve({ matchedResults: [], unmatchedRecords: updateRecords });
 
-                return translator.GetBatchTranslations(fromIso, toIso, phrases)
-                .then(function(translatedPhrases) {
-                    var results = translator.AddTranslations(fromLcid, destLcid, updateRecords, translatedPhrases);
-                    ShowTranslationResults(results);
+            return splitPromise
+            .then(function(split) {
+                var dictionaryResults = (split && split.matchedResults) ? split.matchedResults : [];
+                var recordsForAi = (split && split.unmatchedRecords) ? split.unmatchedRecords : updateRecords;
+
+                if (!recordsForAi || recordsForAi.length === 0) {
+                    ShowTranslationResults(dictionaryResults);
+                    XrmTranslator.UnlockGrid();
+                    return null;
+                }
+
+                if (translator.GetBatchTranslations) {
+                    var phrases = recordsForAi.map(function(record) {
+                        return w2utils.decodeTags(record[fromLcid]);
+                    });
+
+                    return translator.GetBatchTranslations(fromIso, toIso, phrases)
+                    .then(function(translatedPhrases) {
+                        var aiResults = translator.AddTranslations(fromLcid, destLcid, recordsForAi, translatedPhrases);
+                        var mergedResults = dictionaryResults.concat(aiResults);
+                        ShowTranslationResults(mergedResults);
+                        XrmTranslator.UnlockGrid();
+                    });
+                }
+
+                // Generic per-record mode for future provider extensions.
+                var translationRequests = [];
+
+                for (var i = 0; i < recordsForAi.length; i++) {
+                    var record = recordsForAi[i];
+
+                    const source = XrmTranslator.config.translationExceptions && XrmTranslator.config.translationExceptions.length
+                    ? XrmTranslator.config.translationExceptions.reduce(function(all, cur) {
+                        return (all || "").replace(new RegExp(cur, "gmi"), '<escape data="$1"/>')
+                    }, record[fromLcid])
+                    : record[fromLcid]
+
+                    translationRequests.push(translator.GetTranslation(fromIso, toIso, w2utils.decodeTags(source)));
+                }
+
+                return WebApiClient.Promise.all(translationRequests)
+                .then(function (responses) {
+                    var aiResults = translator.AddTranslations(fromLcid, destLcid, recordsForAi, responses);
+                    var mergedResults = dictionaryResults.concat(aiResults);
+                    ShowTranslationResults(mergedResults);
                     XrmTranslator.UnlockGrid();
                 });
-            }
-
-            // Generic per-record mode for future provider extensions.
-            var translationRequests = [];
-
-            for (var i = 0; i < updateRecords.length; i++) {
-                var record = updateRecords[i];
-
-                const source = XrmTranslator.config.translationExceptions && XrmTranslator.config.translationExceptions.length
-                ? XrmTranslator.config.translationExceptions.reduce(function(all, cur) {
-                    return (all || "").replace(new RegExp(cur, "gmi"), '<escape data="$1"/>')
-                }, record[fromLcid])
-                : record[fromLcid]
-
-                translationRequests.push(translator.GetTranslation(fromIso, toIso, w2utils.decodeTags(source)));
-            }
-
-            return WebApiClient.Promise.all(translationRequests)
-            .then(function (responses) {
-                var results = translator.AddTranslations(fromLcid, destLcid, updateRecords, responses);
-                ShowTranslationResults(results);
-                XrmTranslator.UnlockGrid();
             });
         })
         .catch(function(error) {
@@ -546,6 +598,8 @@
         }
 
         var savedRecord = {};
+        savedRecord.useDictionaryFirst = normalizeBoolean(saved && saved.useDictionaryFirst, true);
+
         if (saved) {
             var srcItem = findItem(languageItems, saved.sourceLcid);
             var tgtItem = findItem(languageItems, saved.targetLcid);
@@ -582,6 +636,10 @@
                     '        <label style="min-width: 110px; white-space: nowrap;">API Provider:</label>'+
                     '        <input name="apiProvider" type="list" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 210px; white-space: nowrap;">Use Dictionary as First Priority:</label>'+
+                    '        <input name="useDictionaryFirst" type="checkbox" style="margin-left: 0;"/>'+
+                    '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
                     '    <button class="w2ui-btn" name="cancel">Cancel</button>'+
@@ -591,7 +649,8 @@
                     { field: 'targetLcid', type: 'list', required: true, options: { items: languageItems } },
                     { field: 'sourceLcid', type: 'list', required: true, options: { items: languageItems } },
                     { field: 'translateMissing', type: 'list', required: false, options: { items: translateMissingItems } },
-                    { field: 'apiProvider', type: 'list', required: false, options: { items: apiProviderItems } }
+                    { field: 'apiProvider', type: 'list', required: false, options: { items: apiProviderItems } },
+                    { field: 'useDictionaryFirst', type: 'checkbox', required: false }
                 ],
                 record: savedRecord,
                 actions: {
@@ -603,12 +662,14 @@
                         var targetLcid = this.record.targetLcid.id;
                         var translateMissingVal = this.record.translateMissing ? this.record.translateMissing.id.trim() : "";
                         var apiProviderVal = this.record.apiProvider ? this.record.apiProvider.id : (defaultApiProvider ? defaultApiProvider.id : "");
+                        var useDictionaryFirstVal = normalizeBoolean(this.record.useDictionaryFirst, true);
 
                         SaveTranslationPrompt({
                             sourceLcid: sourceLcid,
                             targetLcid: targetLcid,
                             translateMissing: translateMissingVal,
-                            apiProvider: apiProviderVal
+                            apiProvider: apiProviderVal,
+                            useDictionaryFirst: useDictionaryFirstVal
                         });
 
                         var recordFilter = null;
@@ -630,7 +691,7 @@
                             };
                         }
 
-                        XrmTranslator.ShowRecordSelector("TranslationHandler.ProposeTranslations", [sourceLcid, targetLcid, translateMissingVal, apiProviderVal], (XrmTranslator.GetGrid().getSelection() || []), recordFilter);
+                        XrmTranslator.ShowRecordSelector("TranslationHandler.ProposeTranslations", [sourceLcid, targetLcid, translateMissingVal, apiProviderVal, useDictionaryFirstVal], (XrmTranslator.GetGrid().getSelection() || []), recordFilter);
                     },
                     "cancel": function () {
                         w2popup.close();
@@ -661,7 +722,7 @@
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
                 style   : 'padding: 15px 0px 0px 0px',
                 width   : 650,
-                height  : 320,
+                height  : 360,
                 showMax : true,
                 onToggle: function (event) {
                     $(w2ui.translationPrompt.box).hide();

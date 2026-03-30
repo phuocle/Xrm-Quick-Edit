@@ -811,12 +811,15 @@
                     $('#w2ui-popup #main').w2render('recordSelectorGrid');
                     w2ui.recordSelectorGrid.records.slice().forEach(function(r) { w2ui.recordSelectorGrid.expand(r.recid); });
 
-                    if (preselectedRecords) {
+                    if (preselectedRecords && preselectedRecords.length > 0) {
                         for (let i = 0; i < preselectedRecords.length; i++) {
                             const id = preselectedRecords[i];
 
                             w2ui.recordSelectorGrid.select(id);
                         }
+                    }
+                    else {
+                        w2ui.recordSelectorGrid.selectAll();
                     }
                 };
             },
@@ -1369,6 +1372,12 @@
             TranslationHandler.ShowGeminiSettings();
         } });
 
+        items.push({ type: 'button', id: 'dictionary', text: 'Dictionary', img:'icon-page', onClick: function () {
+            if (window.TranslationDictionaryService && TranslationDictionaryService.ShowDictionaryPrompt) {
+                TranslationDictionaryService.ShowDictionaryPrompt();
+            }
+        } });
+
         if (XrmTranslator.showDebugButton) {
             items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', img:'icon-page', onClick: function () {
                 TranslationHandler.ApplyDebugTranslations();
@@ -1695,6 +1704,27 @@
         .then(function(languages) {
             XrmTranslator.installedLanguages = languages;
             return TranslationHandler.FillLanguageCodes(languages.LocaleIds, XrmTranslator.userSettings, XrmTranslator.config);
+        })
+        .then(function () {
+            if (window.TranslationDictionaryService && TranslationDictionaryService.EnsureInitialized) {
+                XrmTranslator.LockGrid("Preparing dictionary storage...");
+
+                return TranslationDictionaryService.EnsureInitialized()
+                .then(function () {
+                    if (TranslationDictionaryService.PreloadCache) {
+                        return TranslationDictionaryService.PreloadCache();
+                    }
+
+                    return null;
+                })
+                .catch(function(error) {
+                    if (window.console && window.console.warn) {
+                        window.console.warn("Dictionary bootstrap failed.", error);
+                    }
+                });
+            }
+
+            return null;
         })
         .then(function () {
             XrmTranslator.UnlockGrid();
