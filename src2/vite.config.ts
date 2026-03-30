@@ -12,6 +12,7 @@ function fixHtmlForPPTB(): Plugin {
     return {
         name: 'fix-html-for-pptb',
         enforce: 'post',
+        apply: 'build',
         transformIndexHtml(html) {
             // Remove type="module" and crossorigin from script tags
             // IIFE format doesn't need module type, and file:// URLs don't need crossorigin
