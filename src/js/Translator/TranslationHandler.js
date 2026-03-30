@@ -28,6 +28,7 @@
     var locales = null;
     var GEMINI_CONFIG_KEY = "XrmQuickEdit_GeminiConfig";
     var TRANSLATION_PROMPT_KEY = "XrmQuickEdit_TranslationPrompt";
+    var translationProviders = [];
 
     function GetSavedTranslationPrompt() {
         try {
@@ -73,176 +74,39 @@
         return null;
     }
 
-    const deeplTranslator = function (authKey) {
-        var baseUrl = "https://api.deepl.com/v2";
-        var translationApiUrl = baseUrl + "/translate?auth_key=[auth_key]&source_lang=[source_lang]&target_lang=[target_lang]&text=[text]&tag_handling=xml";
-
-        function BuildTranslationUrl (fromLanguage, destLanguage, phrase) {
-            return translationApiUrl
-                .replace("[auth_key]", authKey)
-                .replace("[source_lang]", fromLanguage)
-                .replace("[target_lang]", destLanguage)
-                .replace("[text]", encodeURIComponent(phrase));
+    function RegisterTranslationProvider(provider) {
+        if (!provider || !provider.id || typeof(provider.create) !== "function") {
+            return;
         }
 
-        this.GetTranslation = function(fromLanguage, destLanguage, phrase) {
-            $.support.cors = true;
+        translationProviders.push(provider);
+    }
 
-            return WebApiClient.Promise.resolve($.ajax({
-                url: BuildTranslationUrl(fromLanguage, destLanguage, phrase),
-                type: "GET",
-                crossDomain: true,
-                dataType: "json"
-            }));
-        }
+    function GetTranslationProvider(providerId) {
+        var normalized = String(providerId || "").trim().toLowerCase();
 
-        this.AddTranslations = function(fromLcid, destLcid, updateRecords, responses) {
-            var translations = [];
-
-            for (var i = 0; i < updateRecords.length; i++) {
-                var response = responses[i];
-                var updateRecord = updateRecords[i];
-
-                if (response.translations.length > 0) {
-                    var decoded = response.translations[0].text.replace(/<escape data="(.*?(?="\/>))"\/>/gi, "$1");
-                    var translation = w2utils.encodeTags(decoded);
-
-                    var record = XrmTranslator.GetByRecId(updateRecords, updateRecord.recid);
-
-                    if (!record) {
-                        continue;
-                    }
-
-                    translations.push({
-                        recid: record.recid,
-                        schemaName: record.schemaName,
-                        column: destLcid,
-                        source: record[fromLcid],
-                        translation: translation
-                    });
-                }
+        for (var i = 0; i < translationProviders.length; i++) {
+            var provider = translationProviders[i];
+            if (String(provider.id).toLowerCase() === normalized) {
+                return provider;
             }
-
-            return translations;
         }
 
-        this.CanTranslate = function(fromLcid, destLcid) {
-            $.support.cors = true;
+        return null;
+    }
 
-            return WebApiClient.Promise.resolve($.ajax({
-                url: baseUrl + "/languages?auth_key=" + authKey,
-                type: "GET",
-                crossDomain: true,
-                dataType: "json"
-            }))
-            .then(function(result) {
-                const canTranslateSource = result.some(function (l) {
-                    return l.language.toLowerCase() === fromLcid.toLowerCase()
-                });
+    function GetDefaultTranslationProvider() {
+        return translationProviders.length ? translationProviders[0] : null;
+    }
 
-                const canTranslateTarget = result.some(function (l) {
-                    return l.language.toLowerCase() === destLcid.toLowerCase()
-                });
-
-                return {
-                    [fromLcid]: canTranslateSource,
-                    [destLcid]: canTranslateTarget
-                };
-            });
-        }
-    };
-
-    const azureTranslator = function (authKey, region) {
-        var baseUrl = "https://api.cognitive.microsofttranslator.com";
-        var translationApiUrl = baseUrl + "/translate?api-version=3.0&from=[source_lang]&to=[target_lang]&textType=html";
-        var languageUrl = baseUrl + "/languages?api-version=3.0";
-
-        function BuildTranslationUrl (fromLanguage, destLanguage) {
-            return translationApiUrl
-                .replace("[source_lang]", fromLanguage)
-                .replace("[target_lang]", destLanguage);
-        }
-
-        this.GetTranslation = function(fromLanguage, destLanguage, phrase) {
-            $.support.cors = true;
-
-            const headers = {
-                "Ocp-Apim-Subscription-Key": authKey
+    function GetTranslationProviderItems() {
+        return translationProviders.map(function(provider) {
+            return {
+                id: provider.id,
+                text: provider.text
             };
-
-            if (region) {
-                headers["Ocp-Apim-Subscription-Region"] = region;
-            }
-
-            return WebApiClient.Promise.resolve($.ajax({
-                url: BuildTranslationUrl(fromLanguage, destLanguage),
-                dataType: "json",
-                contentType: "application/json",
-                type: "POST",
-                data: JSON.stringify([{"Text":phrase}]),
-                crossDomain: true,
-                dataType: "json",
-                headers: headers
-            }));
-        }
-
-        this.AddTranslations = function(fromLcid, destLcid, updateRecords, responses) {
-            var translations = [];
-
-            for (var i = 0; i < updateRecords.length; i++) {
-                var response = responses[i][0];
-                var updateRecord = updateRecords[i];
-
-                if (!response) {
-                    continue;
-                }
-
-                if (response.translations.length > 0) {
-                    var decoded = response.translations[0].text.replace(/<escape data="(.*?(?="\/>))"\/>/gi, "$1");
-                    var translation = w2utils.encodeTags(decoded);
-
-                    var record = XrmTranslator.GetByRecId(updateRecords, updateRecord.recid);
-
-                    if (!record) {
-                        continue;
-                    }
-
-                    translations.push({
-                        recid: record.recid,
-                        schemaName: record.schemaName,
-                        column: destLcid,
-                        source: record[fromLcid],
-                        translation: translation
-                    });
-                }
-            }
-
-            return translations;
-        }
-
-        this.CanTranslate = function(fromLcid, destLcid) {
-            $.support.cors = true;
-
-            return WebApiClient.Promise.resolve($.ajax({
-                url: languageUrl,
-                dataType: "json",
-                type: "GET",
-                crossDomain: true,
-                headers: {
-                    "Ocp-Apim-Subscription-Key": authKey
-                }
-            }))
-            .then(function(result) {
-                const canTranslateSource = !!result.translation[fromLcid.toLowerCase()];
-                const canTranslateTarget = !!result.translation[destLcid.toLowerCase()];
-
-                return {
-                    [fromLcid]: canTranslateSource,
-                    [destLcid]: canTranslateTarget
-                };
-            });
-        }
-    };
+        });
+    }
 
     const geminiTranslator = function (apiKey, modelName, customPrompt) {
         var apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" +
@@ -328,6 +192,24 @@
             });
         };
     };
+
+    RegisterTranslationProvider({
+        id: "gemini",
+        text: "Gemini AI",
+        validate: function() {
+            var geminiConfig = GetGeminiConfig();
+
+            if (!geminiConfig || !geminiConfig.apiKey) {
+                return "Gemini: API Key is missing. Please configure it via the Gemini Settings button.";
+            }
+
+            return null;
+        },
+        create: function() {
+            var geminiConfig = GetGeminiConfig();
+            return new geminiTranslator(geminiConfig.apiKey, geminiConfig.modelName, geminiConfig.customPrompt);
+        }
+    });
 
     TranslationHandler.ApplyTranslations = function (selected, results) {
         var grid = XrmTranslator.GetGrid();
@@ -485,68 +367,25 @@
         });
     }
 
-    function CreateTranslator (apiProvider, authKey, region) {
-        switch ((apiProvider ||"").trim().toLowerCase()) {
-            case "deepl":
-                return new deeplTranslator(authKey);
-            case "azure":
-                return new azureTranslator(authKey, region);
-            case "gemini":
-                var geminiConfig = GetGeminiConfig();
-                return new geminiTranslator(geminiConfig.apiKey, geminiConfig.modelName, geminiConfig.customPrompt);
-            default:
-                return null;
-        }
-    }
+    function FindTranslator(fromLcid, destLcid, apiProviderId) {
+        var provider = GetTranslationProvider(apiProviderId) || GetDefaultTranslationProvider();
 
-    function BuildError(preFallBackError, error) {
-        return [preFallBackError, error]
-            .filter(function(e) { return !!e })
-            .join("<br />");
-    }
-
-    function FindTranslator(authKey, authProvider, region, fromLcid, destLcid, apiProvider, preFallBackError) {
-        // When user explicitly selected gemini, handle it directly regardless of config provider
-        if (apiProvider === "gemini") {
-            var geminiConfig = GetGeminiConfig();
-            if (!geminiConfig || !geminiConfig.apiKey) {
-                XrmTranslator.UnlockGrid();
-                return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, "Gemini: API Key is missing. Please configure it via the Gemini Settings button.")]);
-            }
-            var translator = CreateTranslator("gemini");
-            return translator.CanTranslate(fromLcid, destLcid)
-            .then(function(canTranslate) {
-                return [translator];
-            });
+        if (!provider) {
+            return WebApiClient.Promise.resolve([null, "No translation provider registered."]);
         }
 
-        if(apiProvider !== "auto" && (authProvider ||"").trim().toLowerCase() !== apiProvider) {
-            return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, "")]);
+        var validationError = provider.validate ? provider.validate() : null;
+        if (validationError) {
+            return WebApiClient.Promise.resolve([null, validationError]);
         }
 
-        if ((authProvider || "").trim().toLowerCase() === "gemini") {
-            var geminiConfig = GetGeminiConfig();
-            if (!geminiConfig || !geminiConfig.apiKey) {
-                XrmTranslator.UnlockGrid();
-                return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, "Gemini: API Key is missing. Please configure it via the Gemini Settings button.")]);
-            }
-            var translator = CreateTranslator("gemini");
-            return translator.CanTranslate(fromLcid, destLcid)
-            .then(function(canTranslate) {
-                return [translator];
-            });
-        }
-
-        if (!authKey) {
-            XrmTranslator.UnlockGrid();
-            return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, authProvider + ": Auth Key is missing, please add one in the config web resource")]);
-        }
-
-        var translator = CreateTranslator(authProvider, authKey, region);
-
+        var translator = provider.create();
         if (!translator) {
-            XrmTranslator.UnlockGrid();
-            return WebApiClient.Promise.resolve([null, BuildError(preFallBackError, authProvider  + ": Found not supported or missing API Provider, please set one in the config web resource (currently only 'deepl', 'azure' and 'gemini' are supported)")]);
+            return WebApiClient.Promise.resolve([null, provider.text + ": Failed to initialize translator."]);
+        }
+
+        if (!translator.CanTranslate) {
+            return WebApiClient.Promise.resolve([translator]);
         }
 
         return translator.CanTranslate(fromLcid, destLcid)
@@ -555,25 +394,45 @@
                 return [translator];
             }
 
-            const errorMsg = BuildError(preFallBackError, authProvider + " translator does not support the current languages: " + fromLcid + "(" + canTranslate[fromLcid] + "), " + destLcid + "(" + canTranslate[destLcid] + ")");
-
-            return [null, errorMsg];
-        })
+            return [null, provider.text + " does not support the current languages: " + fromLcid + "(" + canTranslate[fromLcid] + "), " + destLcid + "(" + canTranslate[destLcid] + ")"];
+        });
     }
 
     TranslationHandler.ProposeTranslations = function(recordsRaw, fromLcid, destLcid, translateMissing, apiProvider) {
         XrmTranslator.LockGrid("Translating...");
 
-        var records = !translateMissing
-            ? recordsRaw
-            : recordsRaw.filter(function (record) {
-                // If original record had translation set and it was not cleared by pending changes, we skip this record
-                if (record[destLcid] && (!record.w2ui || !record.w2ui.changes || record.w2ui.changes[destLcid]) && (translateMissing !== "missingOrIdentical" || record[fromLcid] !== record[destLcid])) {
-                    return false;
-                }
+        function getCurrentValue(record, lcid) {
+            if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, lcid)) {
+                return record.w2ui.changes[lcid];
+            }
 
+            return record[lcid] || record[String(lcid)];
+        }
+
+        function shouldIncludeRecord(record, mode) {
+            var sourceVal = getCurrentValue(record, fromLcid);
+            var targetVal = getCurrentValue(record, destLcid);
+
+            if (mode === "missing") {
+                return !targetVal;
+            }
+
+            if (mode === "missingOrIdentical") {
+                return !targetVal || sourceVal === targetVal;
+            }
+
+            if (mode === "overwrite") {
                 return true;
-            });
+            }
+
+            // Backward compatibility with previously saved empty mode.
+            return !targetVal;
+        }
+
+        var mode = (translateMissing || "missing").trim();
+        var records = recordsRaw.filter(function (record) {
+            return shouldIncludeRecord(record, mode);
+        });
 
         var fromIso = GetLanguageIsoByLcid(fromLcid);
         var toIso = GetLanguageIsoByLcid(destLcid);
@@ -586,13 +445,7 @@
             return;
         }
 
-        FindTranslator(XrmTranslator.config.translationApiKey, XrmTranslator.config.translationApiProvider, XrmTranslator.config.translationApiRegion, fromIso, toIso, apiProvider)
-        .then(function (result) {
-            if (!result[0] && XrmTranslator.config.translationApiProviderFallback) {
-                return FindTranslator(XrmTranslator.config.translationApiKeyFallback, XrmTranslator.config.translationApiProviderFallback, XrmTranslator.config.translationApiRegionFallback, fromIso, toIso, apiProvider, result[1])
-            }
-            return result;
-        })
+        FindTranslator(fromIso, toIso, apiProvider)
         .then(function(result) {
             var translator = result[0];
 
@@ -622,7 +475,6 @@
                 return null;
             }
 
-            // Batch mode (Gemini AI)
             if (translator.GetBatchTranslations) {
                 var phrases = updateRecords.map(function(record) {
                     return w2utils.decodeTags(record[fromLcid]);
@@ -636,7 +488,7 @@
                 });
             }
 
-            // Per-phrase mode (DeepL, Azure)
+            // Generic per-record mode for future provider extensions.
             var translationRequests = [];
 
             for (var i = 0; i < updateRecords.length; i++) {
@@ -676,8 +528,14 @@
         }
 
         var saved = GetSavedTranslationPrompt();
-        var translateMissingItems = [{id: " ", text: " " }, { id: "missing", text: "All Missing" }, { id: "missingOrIdentical", text: "All Missing Or Identical"}];
-        var apiProviderItems = [{id: "auto", text: "Auto" }, { id: "deepl", text: "DeepL" }, { id: "azure", text: "Azure"}, { id: "gemini", text: "Gemini AI"}];
+        var translateMissingItems = [
+            { id: "missing", text: "All Missing" },
+            { id: "missingOrIdentical", text: "All Missing Or Identical" },
+            { id: "overwrite", text: "All Overwrite" }
+        ];
+        var apiProviderItems = GetTranslationProviderItems();
+        var defaultApiProvider = GetDefaultTranslationProvider();
+        var defaultApiProviderItem = defaultApiProvider ? findItem(apiProviderItems, defaultApiProvider.id) : null;
 
         function findItem(items, id) {
             if (!id) return null;
@@ -694,7 +552,11 @@
             if (srcItem) savedRecord.sourceLcid = srcItem;
             if (tgtItem) savedRecord.targetLcid = tgtItem;
             savedRecord.translateMissing = findItem(translateMissingItems, saved.translateMissing) || translateMissingItems[0];
-            savedRecord.apiProvider = findItem(apiProviderItems, saved.apiProvider) || apiProviderItems[0];
+            savedRecord.apiProvider = findItem(apiProviderItems, saved.apiProvider) || defaultApiProviderItem;
+        }
+
+        if (!savedRecord.apiProvider && defaultApiProviderItem) {
+            savedRecord.apiProvider = defaultApiProviderItem;
         }
 
         if (!w2ui.translationPrompt)
@@ -740,7 +602,7 @@
                         var sourceLcid = this.record.sourceLcid.id;
                         var targetLcid = this.record.targetLcid.id;
                         var translateMissingVal = this.record.translateMissing ? this.record.translateMissing.id.trim() : "";
-                        var apiProviderVal = this.record.apiProvider ? this.record.apiProvider.id : "";
+                        var apiProviderVal = this.record.apiProvider ? this.record.apiProvider.id : (defaultApiProvider ? defaultApiProvider.id : "");
 
                         SaveTranslationPrompt({
                             sourceLcid: sourceLcid,
@@ -754,9 +616,15 @@
                             recordFilter = function(record) {
                                 var targetVal = record[targetLcid] || record[String(targetLcid)];
                                 var sourceVal = record[sourceLcid] || record[String(sourceLcid)];
+
+                                if (translateMissingVal === "overwrite") {
+                                    return true;
+                                }
+
                                 if (translateMissingVal === "missingOrIdentical") {
                                     return !targetVal || sourceVal === targetVal;
                                 }
+
                                 // "missing" - only records without target translation
                                 return !targetVal;
                             };
