@@ -238,6 +238,89 @@
         FillTable();
     }
 
+    // Expose ProcessSelection for AllInOneHandler
+    FormHandler.ProcessSelection = ProcessSelection;
+
+    // Load all forms without showing picker dialog — used by AllInOneHandler
+    FormHandler.LoadAllForms = function () {
+        var entityName = XrmTranslator.GetEntity();
+
+        var formRequest = {
+            entityName: "systemform",
+            queryParams: "?$filter=objecttypecode eq '" + entityName.toLowerCase() + "' and iscustomizable/Value eq true and formactivationstate eq 1"
+        };
+
+        var languages = XrmTranslator.installedLanguages.LocaleIds;
+        var initialLanguage = XrmTranslator.userSettings.uilanguageid;
+        var requests = [];
+
+        for (var i = 0; i < languages.length; i++) {
+            requests.push({
+                action: "Update",
+                language: languages[i]
+            });
+
+            requests.push({
+                action: "Retrieve",
+                language: languages[i]
+            });
+        }
+
+        requests.push({
+            action: "Update",
+            language: initialLanguage
+        });
+
+        return WebApiClient.Promise.reduce(requests, function(total, request){
+            if (request.action === "Update") {
+                return WebApiClient.Update({
+                    overriddenSetName: "usersettingscollection",
+                    entityId: XrmTranslator.userId,
+                    entity: { uilanguageid: request.language }
+                })
+                .then(function(response) {
+                    return total;
+                });
+            }
+            else if (request.action === "Retrieve") {
+                return WebApiClient.Promise.props({
+                    forms: WebApiClient.Retrieve(formRequest),
+                    languageCode: request.language
+                })
+                .then(function (response) {
+                    total.push(response);
+                    return total;
+                });
+            }
+        }, [])
+        .then(function(responses) {
+            FormHandler.formsByLanguage = responses;
+
+            // Process all forms and return per-form data
+            var userLanguageForms = GetUserLanguageForm(responses).forms.value;
+            var allFormData = [];
+
+            for (var i = 0; i < userLanguageForms.length; i++) {
+                var form = userLanguageForms[i];
+                ProcessSelection(form.formid);
+
+                var grid = XrmTranslator.GetGrid();
+                var records = grid.records.filter(function(r) { return !r.w2ui || !r.w2ui.summary; });
+
+                allFormData.push({
+                    formId: form.formid,
+                    formName: form.name || form.formid,
+                    metadata: JSON.parse(JSON.stringify(XrmTranslator.metadata)),
+                    selectedForms: FormHandler.selectedForms ? FormHandler.selectedForms.slice() : [],
+                    records: JSON.parse(JSON.stringify(records))
+                });
+            }
+
+            return allFormData;
+        })
+        .catch(XrmTranslator.errorHandler);
+    };
+
     function ShowFormSelection () {
         var formsByLanguage = FormHandler.formsByLanguage;
 
@@ -515,21 +598,16 @@
         .catch(XrmTranslator.errorHandler);
     }
 
-    FormHandler.Save = function(payload) {
-        XrmTranslator.LockGrid("Saving");
+    FormHandler.SaveOnly = function() {
+        var records = XrmTranslator.GetAllRecords();
+        var formXml = GetParsedForm(XrmTranslator.metadata);
+        var updates = GetUpdates(records);
 
-        var update = undefined;
-
-        if (payload) {
-            update = payload;
+        if (updates.length === 0) {
+            return WebApiClient.Promise.resolve();
         }
-        else {
-            var records = XrmTranslator.GetAllRecords();
-            var formXml = GetParsedForm(XrmTranslator.metadata);
-            var updates = GetUpdates(records);
 
-            update = ApplyUpdates(updates, XrmTranslator.metadata, formXml);
-        }
+        var update = ApplyUpdates(updates, XrmTranslator.metadata, formXml);
 
         return XrmTranslator.SetBaseLanguage(XrmTranslator.userId)
         .then(function() {
@@ -539,6 +617,44 @@
                 entity: update
             });
         })
+        .then(function () {
+            if (XrmTranslator.GetEntity().toLowerCase() === "none") {
+                return XrmTranslator.AddToSolution([XrmTranslator.metadata.formid], XrmTranslator.ComponentType.SystemForm, true, true);
+            }
+            else {
+                return XrmTranslator.AddToSolution([XrmTranslator.metadata.formid], XrmTranslator.ComponentType.SystemForm);
+            }
+        });
+    }
+
+    FormHandler.Save = function(payload) {
+        XrmTranslator.LockGrid("Saving");
+
+        var savePromise;
+
+        if (payload) {
+            // Direct payload from RemoveOverriddenCellLabels
+            savePromise = XrmTranslator.SetBaseLanguage(XrmTranslator.userId)
+            .then(function() {
+                return WebApiClient.Update({
+                    entityName: "systemform",
+                    entityId: XrmTranslator.metadata.formid,
+                    entity: payload
+                });
+            })
+            .then(function () {
+                if (XrmTranslator.GetEntity().toLowerCase() === "none") {
+                    return XrmTranslator.AddToSolution([XrmTranslator.metadata.formid], XrmTranslator.ComponentType.SystemForm, true, true);
+                }
+                else {
+                    return XrmTranslator.AddToSolution([XrmTranslator.metadata.formid], XrmTranslator.ComponentType.SystemForm);
+                }
+            });
+        } else {
+            savePromise = FormHandler.SaveOnly();
+        }
+
+        return savePromise
         .then(function (response){
             XrmTranslator.LockGrid("Publishing");
             var entityName = XrmTranslator.GetEntity();
@@ -547,15 +663,6 @@
             }
             else {
                 return XrmTranslator.Publish();
-            }
-        })
-        .then(function(response) {
-            if (XrmTranslator.GetEntity().toLowerCase() === "none") {
-                // Dashboards can't be added with defined componenent settings or DoNotIncludeSubcomponents flag set to true
-                return XrmTranslator.AddToSolution([XrmTranslator.metadata.formid], XrmTranslator.ComponentType.SystemForm, true, true);
-            }
-            else {
-                return XrmTranslator.AddToSolution([XrmTranslator.metadata.formid], XrmTranslator.ComponentType.SystemForm);
             }
         })
         .then(function(response) {

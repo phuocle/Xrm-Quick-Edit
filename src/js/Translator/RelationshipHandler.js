@@ -267,9 +267,7 @@
         .catch(XrmTranslator.errorHandler);
     };
 
-    RelationshipHandler.Save = function () {
-        XrmTranslator.LockGrid("Saving");
-
+    RelationshipHandler.SaveOnly = function () {
         var updates = GetUpdates();
         var requests = [];
 
@@ -316,14 +314,20 @@
                 return WebApiClient.SendRequest(request.method, request.url, request.payload, request.headers);
             })
             .then(function () {
-                XrmTranslator.LockGrid("Publishing");
-                return XrmTranslator.Publish();
-            })
-            .then(function () {
                 return XrmTranslator.AddToSolution(
                     updates.map(function (u) { return u.MetadataId; }),
                     XrmTranslator.ComponentType.EntityRelationship
                 );
+            });
+    };
+
+    RelationshipHandler.Save = function () {
+        XrmTranslator.LockGrid("Saving");
+
+        return RelationshipHandler.SaveOnly()
+            .then(function () {
+                XrmTranslator.LockGrid("Publishing");
+                return XrmTranslator.Publish();
             })
             .then(function () {
                 return XrmTranslator.ReleaseLockAndPrompt();

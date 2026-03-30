@@ -180,9 +180,7 @@
             .catch(XrmTranslator.errorHandler);
     }
 
-    ViewHandler.Save = function() {
-        XrmTranslator.LockGrid("Saving");
-
+    ViewHandler.SaveOnly = function() {
         var updates = GetUpdates();
         var requests = [];
 
@@ -208,20 +206,24 @@
             .each(function(request) {
                 return WebApiClient.Execute(request);
             })
-            .then(function (response){
-                XrmTranslator.LockGrid("Publishing");
+            .then(function () {
+                return XrmTranslator.AddToSolution(updates.map(function(u) { return u.recid; }), XrmTranslator.ComponentType.SavedQuery);
+            });
+    }
 
+    ViewHandler.Save = function() {
+        XrmTranslator.LockGrid("Saving");
+
+        return ViewHandler.SaveOnly()
+            .then(function () {
+                XrmTranslator.LockGrid("Publishing");
                 return XrmTranslator.Publish();
             })
-            .then(function(response) {
-                return XrmTranslator.AddToSolution(updates.map(function(u) { return u.recid; }), XrmTranslator.ComponentType.SavedQuery);
-            })
-            .then(function(response) {
+            .then(function () {
                 return XrmTranslator.ReleaseLockAndPrompt();
             })
-            .then(function (response) {
+            .then(function () {
                 XrmTranslator.LockGrid("Reloading");
-
                 return ViewHandler.Load();
             })
             .catch(XrmTranslator.errorHandler);

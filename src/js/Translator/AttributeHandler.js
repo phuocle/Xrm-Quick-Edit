@@ -189,9 +189,7 @@
             .catch(XrmTranslator.errorHandler);
     }
 
-    AttributeHandler.Save = function() {
-        XrmTranslator.LockGrid("Saving");
-
+    AttributeHandler.SaveOnly = function() {
         var updates = GetUpdates();
 
         var requests = [];
@@ -214,20 +212,24 @@
             .each(function(request) {
                 return WebApiClient.SendRequest(request.method, request.url, request.attribute, request.headers);
             })
-            .then(function (response){
-                XrmTranslator.LockGrid("Publishing");
+            .then(function () {
+                return XrmTranslator.AddToSolution(updates.map(function(u) { return u.MetadataId; }), XrmTranslator.ComponentType.Attribute);
+            });
+    }
 
+    AttributeHandler.Save = function() {
+        XrmTranslator.LockGrid("Saving");
+
+        return AttributeHandler.SaveOnly()
+            .then(function () {
+                XrmTranslator.LockGrid("Publishing");
                 return XrmTranslator.Publish();
             })
-            .then(function(response) {
-                return XrmTranslator.AddToSolution(updates.map(function(u) { return u.MetadataId; }), XrmTranslator.ComponentType.Attribute);
-            })
-            .then(function(response) {
+            .then(function () {
                 return XrmTranslator.ReleaseLockAndPrompt();
             })
-            .then(function (response) {
+            .then(function () {
                 XrmTranslator.LockGrid("Reloading");
-
                 return AttributeHandler.Load();
             })
             .catch(XrmTranslator.errorHandler);

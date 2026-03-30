@@ -28,6 +28,14 @@
     var bpfData = [];
     var idSeparator = "|";
 
+    BpfHandler.GetBpfData = function() {
+        return JSON.parse(JSON.stringify(bpfData));
+    };
+
+    BpfHandler.SetBpfData = function(data) {
+        bpfData = data;
+    };
+
     function FindStageSteps(step, results) {
         if (!step) {
             return;
@@ -397,16 +405,13 @@
      *     - Workflow is added to the solution (AddToSolution)
      *     - Grid auto-reloads to display new labels from the regenerated clientdata
      */
-    BpfHandler.Save = function () {
-        XrmTranslator.LockGrid("Saving");
-
+    BpfHandler.SaveOnly = function () {
         var records = XrmTranslator.GetAllRecords();
         var updatedWorkflows = GetUpdates(records);
         var workflowIds = Object.keys(updatedWorkflows);
 
         if (workflowIds.length === 0) {
-            XrmTranslator.LockGrid("Reloading");
-            return BpfHandler.Load();
+            return WebApiClient.Promise.resolve();
         }
 
         // For each workflow: Deactivate → Fetch XAML → Update XAML → Save XAML → Activate
@@ -487,7 +492,13 @@
                     workflowIds,
                     XrmTranslator.ComponentType.Workflow
                 );
-            })
+            });
+    };
+
+    BpfHandler.Save = function () {
+        XrmTranslator.LockGrid("Saving");
+
+        return BpfHandler.SaveOnly()
             .then(function () {
                 return XrmTranslator.ReleaseLockAndPrompt();
             })

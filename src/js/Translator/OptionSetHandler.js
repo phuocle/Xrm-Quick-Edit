@@ -255,6 +255,30 @@
             .catch(XrmTranslator.errorHandler);
     }
 
+    OptionSetHandler.SaveOnly = function() {
+        var records = XrmTranslator.GetAllRecords();
+        var updates = GetUpdates(records);
+        var updateIds = GetUpdateIds(records);
+
+        if (!updates || updates.length === 0) {
+            return WebApiClient.Promise.resolve({ globalOptionSetNames: [] });
+        }
+
+        return WebApiClient.Promise.resolve(updates)
+            .each(function(payload) {
+                return WebApiClient.SendRequest("POST", WebApiClient.GetApiUrl() + "UpdateOptionValue", payload);
+            })
+            .then(function () {
+                return Promise.all([
+                    XrmTranslator.AddToSolution(updateIds[0], XrmTranslator.ComponentType.Attribute),
+                    XrmTranslator.AddToSolution(updateIds[1], XrmTranslator.ComponentType.OptionSet, true, true)
+                ]);
+            })
+            .then(function () {
+                return { globalOptionSetNames: updateIds[2] };
+            });
+    }
+
     OptionSetHandler.Save = function() {
         XrmTranslator.LockGrid("Saving");
 
@@ -272,23 +296,21 @@
             .each(function(payload) {
                 return WebApiClient.SendRequest("POST", WebApiClient.GetApiUrl() + "UpdateOptionValue", payload);
             })
-            .then(function (response){
+            .then(function () {
                 XrmTranslator.LockGrid("Publishing");
-
                 return XrmTranslator.Publish(updateIds[2]);
             })
-            .then(function(response) {
+            .then(function () {
                 return Promise.all([
                     XrmTranslator.AddToSolution(updateIds[0], XrmTranslator.ComponentType.Attribute),
                     XrmTranslator.AddToSolution(updateIds[1], XrmTranslator.ComponentType.OptionSet, true, true)
-                ])
+                ]);
             })
-            .then(function(response) {
+            .then(function () {
                 return XrmTranslator.ReleaseLockAndPrompt();
             })
-            .then(function (response) {
+            .then(function () {
                 XrmTranslator.LockGrid("Reloading");
-
                 return OptionSetHandler.Load();
             })
             .catch(XrmTranslator.errorHandler);

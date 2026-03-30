@@ -13,6 +13,7 @@
   <File LocalPath="src/js/PropertyEditor/XrmPropertyEditor.js" UniqueName="oss_/XrmQuickEdit/js/XrmPropertyEditor.js" />
 
   <!-- JS - Translator -->
+  <File LocalPath="src/js/Translator/AllInOneHandler.js" UniqueName="oss_/XrmQuickEdit/js/AllInOneHandler.js" />
   <File LocalPath="src/js/Translator/AttributeHandler.js" UniqueName="oss_/XrmQuickEdit/js/AttributeHandler.js" />
   <File LocalPath="src/js/Translator/BpfHandler.js" UniqueName="oss_/XrmQuickEdit/js/BpfHandler.js" />
   <File LocalPath="src/js/Translator/ChartHandler.js" UniqueName="oss_/XrmQuickEdit/js/ChartHandler.js" />

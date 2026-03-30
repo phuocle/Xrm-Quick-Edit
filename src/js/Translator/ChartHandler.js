@@ -135,9 +135,7 @@
             .catch(XrmTranslator.errorHandler);
     }
 
-    ChartHandler.Save = function () {
-        XrmTranslator.LockGrid("Saving");
-
+    ChartHandler.SaveOnly = function () {
         var updates = GetUpdates();
         var requests = [];
 
@@ -163,20 +161,24 @@
             .each(function (request) {
                 return WebApiClient.Execute(request);
             })
-            .then(function (response) {
-                XrmTranslator.LockGrid("Publishing");
+            .then(function () {
+                return XrmTranslator.AddToSolution(updates.map(function(u) { return u.recid; }), XrmTranslator.ComponentType.SavedQueryVisualization);
+            });
+    }
 
+    ChartHandler.Save = function () {
+        XrmTranslator.LockGrid("Saving");
+
+        return ChartHandler.SaveOnly()
+            .then(function () {
+                XrmTranslator.LockGrid("Publishing");
                 return XrmTranslator.Publish();
             })
-            .then(function(response) {
-                return XrmTranslator.AddToSolution(updates.map(function(u) { return u.recid; }), XrmTranslator.ComponentType.SavedQueryVisualization);
-            })
-            .then(function(response) {
+            .then(function () {
                 return XrmTranslator.ReleaseLockAndPrompt();
             })
-            .then(function (response) {
+            .then(function () {
                 XrmTranslator.LockGrid("Reloading");
-
                 return ChartHandler.Load();
             })
             .catch(XrmTranslator.errorHandler);

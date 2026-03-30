@@ -143,27 +143,29 @@
             .catch(XrmTranslator.errorHandler);
     }
 
-    EntityHandler.Save = function() {
-        XrmTranslator.LockGrid("Saving");
-
+    EntityHandler.SaveOnly = function() {
         var updates = GetUpdates();
         var entityUrl = WebApiClient.GetApiUrl() + "EntityDefinitions(" + XrmTranslator.GetEntityId() + ")";
 
         return WebApiClient.SendRequest("PUT", entityUrl, updates, [{key: "MSCRM.MergeLabels", value: "true"}])
-        .then(function (response){
-            XrmTranslator.LockGrid("Publishing");
+        .then(function () {
+            return XrmTranslator.AddToSolution([XrmTranslator.GetEntityId()], XrmTranslator.ComponentType.Entity);
+        });
+    }
 
+    EntityHandler.Save = function() {
+        XrmTranslator.LockGrid("Saving");
+
+        return EntityHandler.SaveOnly()
+        .then(function () {
+            XrmTranslator.LockGrid("Publishing");
             return XrmTranslator.Publish();
         })
-        .then(function(response) {
-            return XrmTranslator.AddToSolution([XrmTranslator.GetEntityId()], XrmTranslator.ComponentType.Entity);
-        })
-        .then(function(response) {
+        .then(function () {
             return XrmTranslator.ReleaseLockAndPrompt();
         })
-        .then(function (response) {
+        .then(function () {
             XrmTranslator.LockGrid("Reloading");
-
             return EntityHandler.Load();
         })
         .catch(XrmTranslator.errorHandler);

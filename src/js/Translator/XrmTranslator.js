@@ -172,7 +172,10 @@
 
         w2ui['grid_toolbar'].hide("removeOverriddenAttributeLabels");
 
-        if (XrmTranslator.GetType() === "attributes") {
+        if (XrmTranslator.GetType() === "allInOne") {
+            currentHandler = AllInOneHandler;
+        }
+        else if (XrmTranslator.GetType() === "attributes") {
             currentHandler = AttributeHandler;
         }
         else if (XrmTranslator.GetType() === "options") {
@@ -1046,22 +1049,23 @@
             '<hr style="margin: 8px 0; border: none; border-top: 1px solid #ddd;">' +
             '<b>Entity-based types</b> (select an Entity first):' +
             '<ul style="margin: 4px 0 12px 0; padding-left: 20px;">' +
-            '<li><b>Attributes</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Attributes &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Options</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Options &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Forms</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Forms &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Views</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Views &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Form Metadata</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Form Metadata &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Entity Metadata</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Entity Metadata &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Relationships</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Relationships &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Charts</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Charts &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Business Process Flows</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Business Process Flows &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>All-In-One</b> — Loads all entity-dependent types into one grid for bulk translation (Auto Translate &amp; Save in one go)</li>' +
+            '<li><b>1. Attributes</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Attributes &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>2. Options</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Options &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>3. Forms</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Forms &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>4. Views</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Views &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>5. Form Metadata</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Form Metadata &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>6. Entity Metadata</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Entity Metadata &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>7. Relationships</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Relationships &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>8. Charts</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Charts &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>9. Business Process Flows</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Business Process Flows &rarr; Load &rarr; Translate &rarr; Save</li>' +
             '</ul>' +
             '<b>Entity-independent types</b> (set Entity to None):' +
             '<ul style="margin: 4px 0 12px 0; padding-left: 20px;">' +
-            '<li><b>Global Option Sets</b> — Entity &rarr; None &rarr; Type &rarr; Global Option Sets &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Dashboards</b> — Entity &rarr; None &rarr; Type &rarr; Dashboards &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>Web Resources</b> — Entity &rarr; None &rarr; Type &rarr; Web Resources &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>SiteMap</b> — Entity &rarr; None &rarr; Type &rarr; SiteMap &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>1. Sitemap</b> — Entity &rarr; None &rarr; Type &rarr; Sitemap &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>2. Dashboards</b> — Entity &rarr; None &rarr; Type &rarr; Dashboards &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>3. Web Resources</b> — Entity &rarr; None &rarr; Type &rarr; Web Resources &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>4. Global Option Sets</b> — Entity &rarr; None &rarr; Type &rarr; Global Option Sets &rarr; Load &rarr; Translate &rarr; Save</li>' +
             '</ul>' +
             '<b>Special type:</b>' +
             '<ul style="margin: 4px 0 0 0; padding-left: 20px;">' +
@@ -1125,7 +1129,9 @@
             XrmTranslator.entity = entity;
             SetHandler();
 
-            XrmTranslator.LockGrid("Loading " + entity + " attributes");
+            if (XrmTranslator.GetType() !== "allInOne") {
+                XrmTranslator.LockGrid("Loading " + entity + " attributes");
+            }
 
             // Reset column sorting
             XrmTranslator.GetGrid().sort();
@@ -1173,22 +1179,24 @@
                     var el   = this.get('type:' + item.selected);
                     return 'Type: ' + el.text;
                 },
-                selected: 'attributes',
+                selected: 'sitemap',
                 items: [
-                    { id: 'attributes', text: 'Attributes', icon: 'fa-camera' },
-                    { id: 'options', text: 'Options', icon: 'fa-picture' },
-                    { id: 'forms', text: 'Forms', icon: 'fa-picture' },
-                    { id: 'views', text: 'Views', icon: 'fa-picture' },
-                    { id: 'formMeta', text: 'Form Metadata', icon: 'fa-picture' },
-                    { id: 'entityMeta', text: 'Entity Metadata', icon: 'fa-picture' },
-                    { id: 'relationships', text: 'Relationships', icon: 'fa-picture' },
-                    { id: 'sitemap', text: 'SiteMap', icon: 'fa-picture' },
-                    { id: 'charts', text: 'Charts', icon: 'fa-picture' },
-                    { id: 'bpf', text: 'Business Process Flows', icon: 'fa-picture' },
+                    { id: 'allInOne', text: 'All-In-One', icon: 'fa-camera' },
+                    { id: 'entitySeparator', text: '--' },
+                    { id: 'attributes', text: '1. Attributes', icon: 'fa-camera' },
+                    { id: 'options', text: '2. Options', icon: 'fa-picture' },
+                    { id: 'forms', text: '3. Forms', icon: 'fa-picture' },
+                    { id: 'views', text: '4. Views', icon: 'fa-picture' },
+                    { id: 'formMeta', text: '5. Form Metadata', icon: 'fa-picture' },
+                    { id: 'entityMeta', text: '6. Entity Metadata', icon: 'fa-picture' },
+                    { id: 'relationships', text: '7. Relationships', icon: 'fa-picture' },
+                    { id: 'charts', text: '8. Charts', icon: 'fa-picture' },
+                    { id: 'bpf', text: '9. Business Process Flows', icon: 'fa-picture' },
+                    { id: 'sitemap', text: '1. Sitemap', icon: 'fa-picture' },
                     { id: 'content', text: 'Content', icon: 'fa-picture' },
-                    { id: 'dashboards', text: 'Dashboards', icon: 'fa-picture' },
-                    { id: 'webresources', text: 'Web Resources', icon: 'fa-picture' },
-                    { id: 'globalOptionSets', text: 'Global Option Sets', icon: 'fa-picture' }
+                    { id: 'dashboards', text: '2. Dashboards', icon: 'fa-picture' },
+                    { id: 'webresources', text: '3. Web Resources', icon: 'fa-picture' },
+                    { id: 'globalOptionSets', text: '4. Global Option Sets', icon: 'fa-picture' }
                 ]
             },
             { type: 'menu-radio', id: 'component', img: 'icon-folder',
@@ -1225,41 +1233,45 @@
 
                 if (target.startsWith("entitySelect:")) {
                     if (target === "entitySelect:none") {
-                        w2ui['filterbar'].disable('type:attributes');
-                        w2ui['filterbar'].disable('type:options');
-                        w2ui['filterbar'].disable('type:views');
-                        w2ui['filterbar'].disable('type:entityMeta');
-                        w2ui['filterbar'].disable('type:relationships');
-                        w2ui['filterbar'].disable('type:charts');
-                        w2ui['filterbar'].disable('type:content');
-                        w2ui['filterbar'].disable('type:forms');
-                        w2ui['filterbar'].disable('type:formMeta');
-                        w2ui['filterbar'].disable('type:bpf');
+                        w2ui['filterbar'].hide('type:allInOne');
+                        w2ui['filterbar'].hide('type:entitySeparator');
+                        w2ui['filterbar'].hide('type:attributes');
+                        w2ui['filterbar'].hide('type:options');
+                        w2ui['filterbar'].hide('type:views');
+                        w2ui['filterbar'].hide('type:entityMeta');
+                        w2ui['filterbar'].hide('type:relationships');
+                        w2ui['filterbar'].hide('type:charts');
+                        w2ui['filterbar'].hide('type:content');
+                        w2ui['filterbar'].hide('type:forms');
+                        w2ui['filterbar'].hide('type:formMeta');
+                        w2ui['filterbar'].hide('type:bpf');
 
-                        w2ui['filterbar'].enable('type:webresources');
-                        w2ui['filterbar'].enable('type:dashboards');
-                        w2ui['filterbar'].enable('type:sitemap');
-                        w2ui['filterbar'].enable('type:globalOptionSets');
+                        w2ui['filterbar'].show('type:webresources');
+                        w2ui['filterbar'].show('type:dashboards');
+                        w2ui['filterbar'].show('type:sitemap');
+                        w2ui['filterbar'].show('type:globalOptionSets');
                     }
                     else {
-                        w2ui['filterbar'].enable('type:attributes');
-                        w2ui['filterbar'].enable('type:options');
-                        w2ui['filterbar'].enable('type:views');
-                        w2ui['filterbar'].enable('type:entityMeta');
-                        w2ui['filterbar'].enable('type:relationships');
-                        w2ui['filterbar'].enable('type:charts');
-                        w2ui['filterbar'].enable('type:forms');
-                        w2ui['filterbar'].enable('type:formMeta');
-                        w2ui['filterbar'].enable('type:bpf');
+                        w2ui['filterbar'].show('type:allInOne');
+                        w2ui['filterbar'].show('type:entitySeparator');
+                        w2ui['filterbar'].show('type:attributes');
+                        w2ui['filterbar'].show('type:options');
+                        w2ui['filterbar'].show('type:views');
+                        w2ui['filterbar'].show('type:entityMeta');
+                        w2ui['filterbar'].show('type:relationships');
+                        w2ui['filterbar'].show('type:charts');
+                        w2ui['filterbar'].show('type:forms');
+                        w2ui['filterbar'].show('type:formMeta');
+                        w2ui['filterbar'].show('type:bpf');
 
-                        w2ui['filterbar'].disable('type:webresources');
-                        w2ui['filterbar'].disable('type:dashboards');
-                        w2ui['filterbar'].disable('type:sitemap');
-                        w2ui['filterbar'].disable('type:globalOptionSets');
-                        w2ui['filterbar'].disable('type:content');
+                        w2ui['filterbar'].hide('type:webresources');
+                        w2ui['filterbar'].hide('type:dashboards');
+                        w2ui['filterbar'].hide('type:sitemap');
+                        w2ui['filterbar'].hide('type:globalOptionSets');
+                        w2ui['filterbar'].hide('type:content');
 
                         if (target === "entitySelect:Adx_contentsnippet") {
-                            w2ui['filterbar'].enable('type:content');
+                            w2ui['filterbar'].show('type:content');
                         }
 
                         if (["content", "webresources", "dashboards", "sitemap", "globalOptionSets"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
@@ -1270,6 +1282,20 @@
                 }
             }
         });
+
+        // Hide entity-dependent items on initial load (entity defaults to None)
+        w2ui['filterbar'].hide('type:allInOne');
+        w2ui['filterbar'].hide('type:entitySeparator');
+        w2ui['filterbar'].hide('type:attributes');
+        w2ui['filterbar'].hide('type:options');
+        w2ui['filterbar'].hide('type:forms');
+        w2ui['filterbar'].hide('type:views');
+        w2ui['filterbar'].hide('type:formMeta');
+        w2ui['filterbar'].hide('type:entityMeta');
+        w2ui['filterbar'].hide('type:relationships');
+        w2ui['filterbar'].hide('type:charts');
+        w2ui['filterbar'].hide('type:content');
+        w2ui['filterbar'].hide('type:bpf');
 
         var items = [
             { type: 'button', hidden: true, id: 'removeOverriddenAttributeLabels', text: 'Remove Overridden Attribute Labels', img:'w2ui-icon-cross', onClick: function(event) {

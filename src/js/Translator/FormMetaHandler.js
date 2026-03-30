@@ -172,9 +172,7 @@
             .catch(XrmTranslator.errorHandler);
     }
 
-    FormMetaHandler.Save = function() {
-        XrmTranslator.LockGrid("Saving");
-
+    FormMetaHandler.SaveOnly = function() {
         var updates = GetUpdates();
         var requests = [];
 
@@ -200,30 +198,35 @@
             .each(function(request) {
                 return WebApiClient.Execute(request);
             })
-            .then(function (response){
-                XrmTranslator.LockGrid("Publishing");
-                var entityName = XrmTranslator.GetEntity();
-                if (entityName.toLowerCase() === "none") {
-                    return XrmTranslator.PublishDashboard(updates);
-                }
-                else {
-                    return XrmTranslator.Publish();
-                }
-            })
-            .then(function(response) {
+            .then(function () {
                 if (XrmTranslator.GetEntity().toLowerCase() === "none") {
                     return XrmTranslator.AddToSolution(updates.map(function(u) { return u.recid; }), XrmTranslator.ComponentType.SystemForm, true, true);
                 }
                 else {
                     return XrmTranslator.AddToSolution(updates.map(function(u) { return u.recid; }), XrmTranslator.ComponentType.SystemForm);
                 }
+            });
+    }
+
+    FormMetaHandler.Save = function() {
+        XrmTranslator.LockGrid("Saving");
+
+        return FormMetaHandler.SaveOnly()
+            .then(function () {
+                XrmTranslator.LockGrid("Publishing");
+                var entityName = XrmTranslator.GetEntity();
+                if (entityName.toLowerCase() === "none") {
+                    return XrmTranslator.PublishDashboard(GetUpdates());
+                }
+                else {
+                    return XrmTranslator.Publish();
+                }
             })
-            .then(function(response) {
+            .then(function () {
                 return XrmTranslator.ReleaseLockAndPrompt();
             })
-            .then(function (response) {
+            .then(function () {
                 XrmTranslator.LockGrid("Reloading");
-
                 return FormMetaHandler.Load();
             })
             .catch(XrmTranslator.errorHandler);
