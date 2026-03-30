@@ -45,6 +45,9 @@
 
     XrmTranslator.defaultSchemaNameSize = "20%";
 
+    // Toggle quick DEBUG autofill button in toolbar (true = show, false = hide).
+    XrmTranslator.showDebugButton = true;
+
     XrmTranslator.allEntities = [];
 
     var currentHandler = null;
@@ -1312,6 +1315,12 @@
         items.push({ type: 'button', id: 'geminiSettings', text: 'Gemini Settings', img:'icon-page', onClick: function (event) {
             TranslationHandler.ShowGeminiSettings();
         } });
+
+        if (XrmTranslator.showDebugButton) {
+            items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', img:'icon-page', onClick: function () {
+                TranslationHandler.ApplyDebugTranslations();
+            } });
+        }
 
         if (XrmTranslator.config.enableLocking) {
             items.push({ type: 'menu-radio', id: 'lockOrUnlock', img: 'w2ui-icon-cross',

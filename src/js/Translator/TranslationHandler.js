@@ -24,7 +24,7 @@
 */
 (function (TranslationHandler, undefined) {
     "use strict";
-    
+
     var locales = null;
     var GEMINI_CONFIG_KEY = "XrmQuickEdit_GeminiConfig";
     var TRANSLATION_PROMPT_KEY = "XrmQuickEdit_TranslationPrompt";
@@ -59,7 +59,7 @@
 
     function GetLanguageIsoByLcid (lcid) {
         var locByLocales = locales.find(function(loc) { return loc.localeid === lcid; });
-       
+
         if (locByLocales) {
             return locByLocales.code.substr(0, 2);
         }
@@ -84,10 +84,10 @@
                 .replace("[target_lang]", destLanguage)
                 .replace("[text]", encodeURIComponent(phrase));
         }
-    
+
         this.GetTranslation = function(fromLanguage, destLanguage, phrase) {
             $.support.cors = true;
-    
+
             return WebApiClient.Promise.resolve($.ajax({
                 url: BuildTranslationUrl(fromLanguage, destLanguage, phrase),
                 type: "GET",
@@ -95,24 +95,24 @@
                 dataType: "json"
             }));
         }
-        
+
         this.AddTranslations = function(fromLcid, destLcid, updateRecords, responses) {
             var translations = [];
-    
+
             for (var i = 0; i < updateRecords.length; i++) {
                 var response = responses[i];
                 var updateRecord = updateRecords[i];
-    
+
                 if (response.translations.length > 0) {
                     var decoded = response.translations[0].text.replace(/<escape data="(.*?(?="\/>))"\/>/gi, "$1");
                     var translation = w2utils.encodeTags(decoded);
-    
+
                     var record = XrmTranslator.GetByRecId(updateRecords, updateRecord.recid);
-    
+
                     if (!record) {
                         continue;
                     }
-    
+
                     translations.push({
                         recid: record.recid,
                         schemaName: record.schemaName,
@@ -128,7 +128,7 @@
 
         this.CanTranslate = function(fromLcid, destLcid) {
             $.support.cors = true;
-    
+
             return WebApiClient.Promise.resolve($.ajax({
                 url: baseUrl + "/languages?auth_key=" + authKey,
                 type: "GET",
@@ -150,7 +150,7 @@
                 };
             });
         }
-    };   
+    };
 
     const azureTranslator = function (authKey, region) {
         var baseUrl = "https://api.cognitive.microsofttranslator.com";
@@ -162,7 +162,7 @@
                 .replace("[source_lang]", fromLanguage)
                 .replace("[target_lang]", destLanguage);
         }
-    
+
         this.GetTranslation = function(fromLanguage, destLanguage, phrase) {
             $.support.cors = true;
 
@@ -188,11 +188,11 @@
 
         this.AddTranslations = function(fromLcid, destLcid, updateRecords, responses) {
             var translations = [];
-    
+
             for (var i = 0; i < updateRecords.length; i++) {
                 var response = responses[i][0];
                 var updateRecord = updateRecords[i];
-    
+
                 if (!response) {
                     continue;
                 }
@@ -200,13 +200,13 @@
                 if (response.translations.length > 0) {
                     var decoded = response.translations[0].text.replace(/<escape data="(.*?(?="\/>))"\/>/gi, "$1");
                     var translation = w2utils.encodeTags(decoded);
-    
+
                     var record = XrmTranslator.GetByRecId(updateRecords, updateRecord.recid);
-    
+
                     if (!record) {
                         continue;
                     }
-    
+
                     translations.push({
                         recid: record.recid,
                         schemaName: record.schemaName,
@@ -222,7 +222,7 @@
 
         this.CanTranslate = function(fromLcid, destLcid) {
             $.support.cors = true;
-            
+
             return WebApiClient.Promise.resolve($.ajax({
                 url: languageUrl,
                 dataType: "json",
@@ -359,6 +359,71 @@
         if (savable) {
             XrmTranslator.SetSaveButtonDisabled(false);
         }
+    }
+
+    TranslationHandler.ApplyDebugTranslations = function () {
+        XrmTranslator.LockGrid("Applying debug translations...");
+
+        return XrmTranslator.GetBaseLanguage()
+        .then(function (baseLanguage) {
+            var grid = XrmTranslator.GetGrid();
+            var baseLcid = String(baseLanguage);
+            var languageColumns = XrmTranslator.GetColumns(false).map(function (c) { return String(c); });
+
+            if (languageColumns.indexOf(baseLcid) === -1) {
+                XrmTranslator.UnlockGrid();
+                w2alert("Base language column " + baseLcid + " is not available in this grid.");
+                return;
+            }
+
+            var targetColumns = languageColumns.filter(function (lcid) { return lcid !== baseLcid; });
+            var records = XrmTranslator.GetAllRecords();
+            var updates = 0;
+
+            for (var i = 0; i < records.length; i++) {
+                var record = records[i];
+
+                if ((record.w2ui && record.w2ui.summary) || record._isGroupNode || (record.w2ui && record.w2ui.editable === false)) {
+                    continue;
+                }
+
+                var sourceValue = null;
+
+                if (record.w2ui && record.w2ui.changes && typeof record.w2ui.changes[baseLcid] !== "undefined") {
+                    sourceValue = record.w2ui.changes[baseLcid];
+                }
+                else {
+                    sourceValue = record[baseLcid];
+                }
+
+                if (sourceValue == null || sourceValue === "") {
+                    continue;
+                }
+
+                if (!record.w2ui) {
+                    record.w2ui = {};
+                }
+
+                if (!record.w2ui.changes) {
+                    record.w2ui.changes = {};
+                }
+
+                for (var j = 0; j < targetColumns.length; j++) {
+                    var targetLcid = targetColumns[j];
+                    record.w2ui.changes[targetLcid] = sourceValue + " " + targetLcid;
+                    updates++;
+                }
+
+                grid.refreshRow(record.recid);
+            }
+
+            if (updates > 0) {
+                XrmTranslator.SetSaveButtonDisabled(false);
+            }
+
+            XrmTranslator.UnlockGrid();
+        })
+        .catch(XrmTranslator.errorHandler);
     }
 
     function ShowTranslationResults (results) {
