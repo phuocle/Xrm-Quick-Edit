@@ -1,0 +1,80 @@
+{
+  "name": "@phuocle/xrm-quick-translate",
+  "version": "1.0.0",
+  "displayName": "Xrm Quick Translate",
+  "description": "Bulk translation management for Dataverse metadata",
+  "main": "index.html",
+  "icon": "icons/tool.svg",
+  "license": "MIT",
+  "contributors": [
+    {
+      "name": "Phuoc Le"
+    }
+  ],
+  "configurations": {
+    "repository": "https://github.com/phuocle/xrm-quick-translate",
+    "readmeUrl": "https://raw.githubusercontent.com/phuocle/xrm-quick-translate/main/README.md"
+  },
+  "features": {
+    "minAPI": "1.2.0"
+  },
+  "cspExceptions": {
+    "connect-src": [
+      {
+        "domain": "api.cognitive.microsofttranslator.com",
+        "exceptionReason": "Azure Translator API",
+        "optional": true
+      },
+      {
+        "domain": "api-free.deepl.com",
+        "exceptionReason": "DeepL API Free",
+        "optional": true
+      },
+      {
+        "domain": "api.deepl.com",
+        "exceptionReason": "DeepL API Pro",
+        "optional": true
+      },
+      {
+        "domain": "generativelanguage.googleapis.com",
+        "exceptionReason": "Gemini AI translation",
+        "optional": true
+      },
+      {
+        "domain": "glosbe.com",
+        "exceptionReason": "Glosbe free translation",
+        "optional": true
+      }
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc && vite build",
+    "dev": "vite",
+    "watch": "vite build --watch",
+    "preview": "vite preview",
+    "finalize-package": "npm shrinkwrap"
+  },
+  "dependencies": {
+    "@fluentui/react-components": "^9.72.7",
+    "@fluentui/react-icons": "^2.0.314",
+    "ag-grid-community": "^35.2.0",
+    "ag-grid-react": "^35.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@pptb/types": "^1.2.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.21"
+  },
+  "files": [
+    "dist",
+    "npm-shrinkwrap.json"
+  ]
+}
