@@ -210,6 +210,9 @@
         else if (XrmTranslator.GetType() === "webresources") {
             currentHandler = WebResourceHandler;
         }
+        else if (XrmTranslator.GetType() === "globalOptionSets") {
+            currentHandler = GlobalOptionSetHandler;
+        }
 
         w2ui.grid.refresh();
         w2ui.grid_toolbar.refresh();
@@ -1138,7 +1141,8 @@
                     { id: 'bpf', text: 'Business Process Flows', icon: 'fa-picture' },
                     { id: 'content', text: 'Content', icon: 'fa-picture' },
                     { id: 'dashboards', text: 'Dashboards', icon: 'fa-picture' },
-                    { id: 'webresources', text: 'Web Resources', icon: 'fa-picture' }
+                    { id: 'webresources', text: 'Web Resources', icon: 'fa-picture' },
+                    { id: 'globalOptionSets', text: 'Global Option Sets', icon: 'fa-picture' }
                 ]
             },
             { type: 'menu-radio', id: 'component', img: 'icon-folder',
@@ -1183,6 +1187,7 @@
                         w2ui['filterbar'].enable('type:webresources');
                         w2ui['filterbar'].enable('type:dashboards');
                         w2ui['filterbar'].enable('type:sitemap');
+                        w2ui['filterbar'].enable('type:globalOptionSets');
                     }
                     else {
                         w2ui['filterbar'].enable('type:attributes');
@@ -1198,13 +1203,14 @@
                         w2ui['filterbar'].disable('type:webresources');
                         w2ui['filterbar'].disable('type:dashboards');
                         w2ui['filterbar'].disable('type:sitemap');
+                        w2ui['filterbar'].disable('type:globalOptionSets');
                         w2ui['filterbar'].disable('type:content');
 
                         if (target === "entitySelect:Adx_contentsnippet") {
                             w2ui['filterbar'].enable('type:content');
                         }
 
-                        if (["content", "webresources", "dashboards", "sitemap"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
+                        if (["content", "webresources", "dashboards", "sitemap", "globalOptionSets"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
                             w2ui.filterbar.get("type").selected = "attributes";
                             w2ui.filterbar.refresh();
                         }
