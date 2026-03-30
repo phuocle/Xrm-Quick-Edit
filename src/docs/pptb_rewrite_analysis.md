@@ -1,7 +1,7 @@
 # Phân Tích: Viết Lại Từ Đầu cho PPTB (Dùng Code Cũ Làm Tham Khảo)
 
 > Ngày phân tích: 30/03/2026
-> Xem thêm: [pptb_port_analysis.md](./pptb_port_analysis.md) — phân tích hướng port/refactor
+> Tham khảo: [powerplatformtoolbox.com](https://www.powerplatformtoolbox.com) | [PPTB Docs](https://docs.powerplatformtoolbox.com) | [GitHub](https://github.com/PowerPlatformToolBox)
 
 ---
 
@@ -46,37 +46,19 @@ Khi port code cũ sang PPTB:
 
 ## 3. Quyết Định Kiến Trúc Quan Trọng
 
-### 3.1 Framework UI
+### 3.1 Framework UI — React + Fluent UI v9
 
-| Option | Bundle size | Phù hợp PPTB | Ecosystem grid | Khuyến nghị |
-|--------|------------|--------------|----------------|-------------|
-| **React + Fluent UI v9** | ~158KB | ✅✅ (PPTB tự dùng Fluent) | TanStack Table / AG Grid Community | ⭐⭐⭐ |
-| HTML/TypeScript thuần | ~50KB | ✅ | Thư viện grid rời | ⭐⭐ |
-| Vue 3 | ~77KB | ✅ | Vue-compatible grid | ⭐⭐ |
-| Svelte 5 | ~45KB | ✅ | Svelte-compatible grid | ⭐⭐ |
-
-**Khuyến nghị: React + Fluent UI v9 (Microsoft)**
-
-Lý do:
-- Fluent UI v9 là design system chính thức của Microsoft Power Platform — nhìn sẽ nhất quán với PPTB host.
+- Fluent UI v9 là design system chính thức của Microsoft Power Platform — nhất quán với PPTB host.
 - PPTB tự dùng Fluent → không có CSS conflict giữa host và tool (cùng version).
-- Ecosystem React lớn nhất cho grid component (TanStack Table, AG Grid).
+- Ecosystem React lớn nhất cho grid component.
 - `@pptb/types` compatible với React.
+- `generator-pptb` (repo [PowerPlatformToolBox/generator-pptb](https://github.com/PowerPlatformToolBox/generator-pptb)) hỗ trợ scaffold React + TypeScript template sẵn.
 
-### 3.2 Grid Component — Thay thế w2ui
+### 3.2 Grid Component — AG Grid Community
 
-Grid là trái tim của tool. Không thể dùng w2ui mới vì không có TypeScript types tốt và ít được maintain. Các lựa chọn:
+Thay thế w2ui 1.5.rc1 (không có TypeScript types, không còn được maintain).
 
-| Grid | License | Inline edit | TypeScript | Tree rows | Khuyến nghị |
-|------|---------|-------------|------------|-----------|-------------|
-| **AG Grid Community** | MIT | ✅ | ✅✅ | ✅ | ⭐⭐⭐ |
-| TanStack Table v8 | MIT | Tự build | ✅✅ | ✅ | ⭐⭐ (cần nhiều code hơn) |
-| Handsontable Community | MIT (v6+) | ✅ | ✅ | ❌ | ⭐ (không có tree) |
-| Fluent UI DataGrid | MIT | Tự build | ✅✅ | ❌ | ⭐ (không có tree) |
-
-**Khuyến nghị: AG Grid Community (miễn phí)**
-
-AG Grid Community hỗ trợ đầy đủ: inline editing, tree data (cần cho FormHandler), column auto-generate, virtual scrolling cho metadata lớn. API tốt hơn w2ui nhiều. Có bundled size lớn hơn (~300KB) nhưng chấp nhận được cho desktop app.
+AG Grid Community (MIT, miễn phí) hỗ trợ đầy đủ: inline editing, tree data (cần cho FormHandler), column auto-generate, virtual scrolling cho metadata lớn. Bundle size ~300KB — chấp nhận được cho desktop app.
 
 ---
 
@@ -136,6 +118,8 @@ export interface IHandler {
     save(rows: GridRow[], changes: CellChange[], context: AppContext): Promise<void>;
 }
 ```
+
+> **Note**: Tất cả handler `save()` cần truyền `{ mergeLabels: true }` khi gọi `updateAttribute()` / `updateEntityDefinition()` / `updateRelationship()` — đã confirmed PPTB API hỗ trợ parameter này.
 
 ### 4.2 AppContext (thay thế `window.XrmTranslator`)
 
@@ -287,10 +271,17 @@ FormHandler đủ phức tạp để có sprint riêng:
 - [ ] Tree data rendering trong AG Grid (nested rows cho Form → Tab → Section → Field)
 - [ ] Save: reconstruct lại formxml từ changes
 
-### Phase 5 — Translation Providers (0.5 tuần)
+### Phase 5 — Translation Providers & Settings (0.5 tuần)
 
 - [ ] `translationService.ts` với 4 providers
-- [ ] API keys lưu trong `toolboxAPI.settings` thay localStorage
+- [ ] API keys quản lý qua `toolboxAPI.settings` API (thay vì `localStorage`):
+  ```typescript
+  // Đọc setting
+  const apiKey = await toolboxAPI.settings.get('azureTranslatorKey');
+  // Lưu setting
+  await toolboxAPI.settings.set('azureTranslatorKey', key);
+  ```
+  Ưu điểm: settings tự động persist theo PPTB app, không mất khi clear browser data.
 - [ ] `AutoTranslateDialog.tsx` component
 - [ ] CSP exceptions trong `package.json`
 
@@ -303,6 +294,7 @@ FormHandler đủ phức tạp để có sprint riêng:
 ### Phase 7 — Polish & Publish (0.5 tuần)
 
 - [ ] Loading states, error handling toàn diện với `toolboxAPI.utils.showNotification`
+- [ ] Lắng nghe connection events qua `Events API` (reconnect, environment switch)
 - [ ] Validate `package.json` với `npx pptb-validate`
 - [ ] Test debug mode trong PPTB
 - [ ] `npm publish` + submit marketplace
@@ -419,25 +411,56 @@ export const dataverseService = {
 
 ---
 
-## 10. Tóm Tắt
+## 10. PPTB API Coverage — Đã Verify
+
+Tất cả API cần thiết đều đã được confirm từ [PPTB Dataverse API Docs](https://docs.powerplatformtoolbox.com/tool-development/api-reference/dataverse-api):
+
+| API Method | Dùng cho | Status |
+|---|---|---|
+| `getEntityRelatedMetadata(entity, 'Attributes')` | AttributeHandler Load | ✅ Confirmed |
+| `updateAttribute(entity, attrId, def, { mergeLabels })` | AttributeHandler Save | ✅ Confirmed |
+| `getEntityMetadata(entity)` | EntityHandler Load | ✅ Confirmed |
+| `updateEntityDefinition(entityId, def, { mergeLabels })` | EntityHandler Save | ✅ Confirmed |
+| `fetchXmlQuery(fetchXml)` | ViewHandler, ChartHandler, BpfHandler, ContentSnippetHandler | ✅ Confirmed |
+| `update(entitySet, id, data)` | Generic record update (views, charts, usersettings) | ✅ Confirmed |
+| `updateGlobalOptionSet(id, def)` | GlobalOptionSetHandler Save | ✅ Confirmed |
+| `updateOptionValue(...)` | OptionSetHandler Save | ✅ Confirmed |
+| `updateRelationship(id, def)` | RelationshipHandler Save | ✅ Confirmed |
+| `publishCustomizations(entity)` | Publish sau khi save | ✅ Confirmed |
+| `execute(request)` | Custom actions (PublishAllXml, etc.) | ✅ Confirmed |
+| `buildLabel(lcid, text)` | Helper tạo Label object | ✅ Confirmed |
+| `retrieve(entitySet, id, columns)` | FormHandler — lấy formxml | ✅ Confirmed |
+
+**Kết luận**: Không có blocker kỹ thuật nào. PPTB Dataverse API bao phủ 100% các thao tác mà Xrm Quick Edit cần.
+
+---
+
+## 11. Tóm Tắt (Updated 30/03/2026)
 
 | | Viết lại từ đầu |
 |--|----------------|
-| **Thời gian** | ~6-8 tuần |
+| **Thời gian** | ~6-8 tuần (+ 1-2 tuần buffer cho testing song song với tool cũ) |
 | **Độ khó** | Trung bình-Cao (cần đọc kỹ code cũ để không bỏ sót edge case) |
 | **Chất lượng kết quả** | Cao — clean TypeScript, type-safe, testable, modern UI |
-| **Blocker kỹ thuật** | Không — `dataverseAPI` của PPTB hỗ trợ đầy đủ kể cả mergeLabels |
+| **Blocker kỹ thuật** | Không — PPTB Dataverse API đã verify hỗ trợ đầy đủ (bảng Section 10) |
 | **Rủi ro chính** | Bỏ sót một edge case trong code cũ → regression bug |
-| **Giảm thiểu rủi ro** | Đọc kỹ từng handler cũ trước khi implement; sau đó test song song với tool cũ |
+| **Giảm thiểu rủi ro** | Đọc kỹ từng handler cũ trước khi implement; test song song với tool cũ trên cùng environment |
 
 **Recommendation**: Nếu đây là project dài hạn → viết lại. Nếu muốn có PPTB tool chạy được trong vòng 1 tháng → port trước, refactor sau.
 
 ---
 
-## 11. Tài Nguyên
+## 12. Tài Nguyên
 
-- PPTB API Docs: https://docs.powerplatformtoolbox.com/tool-development/api-reference/dataverse-api
+### PPTB
+- PPTB Website: https://www.powerplatformtoolbox.com
+- PPTB Docs: https://docs.powerplatformtoolbox.com
+- PPTB Dataverse API Reference: https://docs.powerplatformtoolbox.com/tool-development/api-reference/dataverse-api
+- PPTB GitHub: https://github.com/PowerPlatformToolBox
+- `generator-pptb` scaffold: https://github.com/PowerPlatformToolBox/generator-pptb (`npx --package yo --package generator-pptb -- yo pptb`)
+- Sample tools: https://github.com/PowerPlatformToolBox/sample-tools
+- PPTB Discord: https://discord.gg/efwAu9sXyJ
+
+### Libraries
 - AG Grid Docs: https://www.ag-grid.com/react-data-grid/
 - Fluent UI v9: https://react.fluentui.dev/
-- `yo pptb` scaffold: `npx --package yo --package generator-pptb -- yo pptb`
-- PPTB Discord: https://discord.gg/efwAu9sXyJ
