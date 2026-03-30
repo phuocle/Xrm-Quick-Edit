@@ -191,8 +191,7 @@
             .then(function () {
                 XrmTranslator.LockGrid("Publishing");
 
-                return XrmTranslator.SetBaseLanguage(XrmTranslator.userId)
-                    .then(function () {
+                return XrmTranslator.RunAsBaseLanguage(function () {
                         var optionSetXml = optionSetNames.map(function (n) {
                             return "<optionset>" + n + "</optionset>";
                         }).join("");
@@ -202,9 +201,6 @@
                             payload: { ParameterXml: xml }
                         });
                         return WebApiClient.Execute(request);
-                    })
-                    .then(function () {
-                        return XrmTranslator.RestoreUserLanguage();
                     });
             })
             .then(function () {

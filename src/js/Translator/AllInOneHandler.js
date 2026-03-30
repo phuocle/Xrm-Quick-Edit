@@ -302,6 +302,18 @@
 
     AllInOneHandler.Save = function() {
         var grid = XrmTranslator.GetGrid();
+        var filterbarEl = $("#filterbar");
+        var originalFilterbarPointerEvents = filterbarEl.css("pointer-events");
+        var originalFilterbarOpacity = filterbarEl.css("opacity");
+
+        function restoreFilterbarInteraction() {
+            filterbarEl.css("pointer-events", originalFilterbarPointerEvents || "");
+            filterbarEl.css("opacity", originalFilterbarOpacity || "");
+        }
+
+        // During All-In-One save, block the top filter toolbar to prevent state changes mid-flight.
+        filterbarEl.css("pointer-events", "none");
+        filterbarEl.css("opacity", "0.8");
 
         XrmTranslator.LockGrid("Saving ......");
 
@@ -348,46 +360,44 @@
         chain = chain.then(function() {
             if (!savedState.forms || !savedState.forms.perFormData) return;
 
-            var formRecordGroups = {};
-            for (var prefix in groups) {
-                if (prefix.indexOf("form~") === 0) {
-                    formRecordGroups[prefix] = groups[prefix];
+            return XrmTranslator.RunAsBaseLanguage(function () {
+                var formRecordGroups = {};
+                for (var prefix in groups) {
+                    if (prefix.indexOf("form~") === 0) {
+                        formRecordGroups[prefix] = groups[prefix];
+                    }
                 }
-            }
 
-            var formChain = WebApiClient.Promise.resolve();
+                var formChain = WebApiClient.Promise.resolve();
 
-            for (var i = 0; i < savedState.forms.perFormData.length; i++) {
-                (function(fd) {
-                    formChain = formChain.then(function() {
-                        var formRecords = formRecordGroups[fd.prefix];
-                        if (!formRecords || formRecords.length === 0) return;
-                        if (!hasChanges(formRecords)) return;
+                for (var i = 0; i < savedState.forms.perFormData.length; i++) {
+                    (function(fd) {
+                        formChain = formChain.then(function() {
+                            var formRecords = formRecordGroups[fd.prefix];
+                            if (!formRecords || formRecords.length === 0) return;
+                            if (!hasChanges(formRecords)) return;
 
-                        XrmTranslator.metadata = deepClone(fd.metadata);
-                        FormHandler.selectedForms = fd.selectedForms;
+                            XrmTranslator.metadata = deepClone(fd.metadata);
+                            FormHandler.selectedForms = fd.selectedForms;
 
-                        stripPrefixFromRecords(formRecords, fd.prefix);
+                            stripPrefixFromRecords(formRecords, fd.prefix);
 
-                        grid.records = formRecords;
-                        grid.total = formRecords.length;
+                            grid.records = formRecords;
+                            grid.total = formRecords.length;
 
-                        return FormHandler.SaveOnly();
-                    });
-                })(savedState.forms.perFormData[i]);
-            }
+                            return FormHandler.SaveOnly(true);
+                        });
+                    })(savedState.forms.perFormData[i]);
+                }
 
-            return formChain;
+                return formChain;
+            });
         });
 
         // PublishAllXml once at the end, then release lock and reload
         chain = chain.then(function() {
-            return XrmTranslator.SetBaseLanguage(XrmTranslator.userId)
-            .then(function() {
+            return XrmTranslator.RunAsBaseLanguage(function () {
                 return WebApiClient.Execute(WebApiClient.Requests.PublishAllXmlRequest);
-            })
-            .then(function() {
-                return XrmTranslator.RestoreUserLanguage();
             });
         })
         .then(function() {
@@ -396,7 +406,11 @@
         .then(function() {
             return AllInOneHandler.Load();
         })
+        .then(function() {
+            restoreFilterbarInteraction();
+        })
         .catch(function(err) {
+            restoreFilterbarInteraction();
             XrmTranslator.errorHandler(err);
         });
 

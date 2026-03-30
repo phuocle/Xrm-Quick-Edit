@@ -52,6 +52,8 @@
 
     var currentHandler = null;
     var solutionEntityCache = {};
+    var baseLanguageScopeDepth = 0;
+    var baseLanguageRestoreLcid = null;
 
     RegExp.escape= function(s) {
         return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -318,9 +320,71 @@
         return XrmTranslator.SetUserLanguage(XrmTranslator.userId, initialLanguage);
     };
 
-    XrmTranslator.Publish = function(globalOptionSetNames) {
+    XrmTranslator.RunAsBaseLanguage = function (action) {
+        if (typeof action !== "function") {
+            return Promise.resolve(null);
+        }
+
+        if (baseLanguageScopeDepth > 0) {
+            baseLanguageScopeDepth++;
+
+            return Promise.resolve()
+            .then(function () {
+                return action();
+            })
+            .then(function (result) {
+                baseLanguageScopeDepth--;
+                return result;
+            }, function (error) {
+                baseLanguageScopeDepth--;
+                throw error;
+            });
+        }
+
+        baseLanguageScopeDepth = 1;
+        baseLanguageRestoreLcid = XrmTranslator.userSettings && XrmTranslator.userSettings.uilanguageid;
+
+        function resetScope() {
+            var restoreLcid = baseLanguageRestoreLcid;
+            baseLanguageRestoreLcid = null;
+            baseLanguageScopeDepth = 0;
+
+            return restoreLcid;
+        }
+
         return XrmTranslator.SetBaseLanguage(XrmTranslator.userId)
-            .then(function() {
+        .then(function () {
+            return action();
+        })
+        .then(function (result) {
+            var restoreLcid = resetScope();
+
+            if (restoreLcid == null) {
+                return result;
+            }
+
+            return XrmTranslator.SetUserLanguage(XrmTranslator.userId, restoreLcid)
+            .then(function () {
+                return result;
+            });
+        }, function (error) {
+            var restoreLcid = resetScope();
+
+            if (restoreLcid == null) {
+                throw error;
+            }
+
+            return XrmTranslator.SetUserLanguage(XrmTranslator.userId, restoreLcid)
+            .then(function () {
+                throw error;
+            }, function () {
+                throw error;
+            });
+        });
+    };
+
+    XrmTranslator.Publish = function(globalOptionSetNames) {
+        return XrmTranslator.RunAsBaseLanguage(function () {
                 var options = (globalOptionSetNames || []);
                 var optionSetString = "<optionsets>" + options.map(function(o) { return "<optionset>" + o + "</optionset>"; }).join("") + "</optionsets>";
 
@@ -334,15 +398,11 @@
                     })
                 return WebApiClient.Execute(request);
             })
-            .then(function() {
-                return XrmTranslator.RestoreUserLanguage();
-            })
             .catch(XrmTranslator.errorHandler);
     }
 
     XrmTranslator.PublishDashboard = function (dashboardIds) {
-        return XrmTranslator.SetBaseLanguage(XrmTranslator.userId)
-            .then(function () {
+        return XrmTranslator.RunAsBaseLanguage(function () {
 
                 var xml = "<importexportxml><dashboards>";
                 for (var i = 0; i < dashboardIds.length; i++) {
@@ -358,15 +418,11 @@
                     })
                 return WebApiClient.Execute(request);
             })
-            .then(function () {
-                return XrmTranslator.RestoreUserLanguage();
-            })
             .catch(XrmTranslator.errorHandler);
     }
 
     XrmTranslator.PublishWebResources = function (webresourceIds) {
-        return XrmTranslator.SetBaseLanguage(XrmTranslator.userId)
-            .then(function () {
+        return XrmTranslator.RunAsBaseLanguage(function () {
 
                 var xml = "<importexportxml><webresources>";
                 for (var i = 0; i < webresourceIds.length; i++) {
@@ -381,9 +437,6 @@
                         }
                     })
                 return WebApiClient.Execute(request);
-            })
-            .then(function () {
-                return XrmTranslator.RestoreUserLanguage();
             })
             .catch(XrmTranslator.errorHandler);
     }

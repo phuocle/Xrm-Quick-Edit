@@ -364,6 +364,17 @@
     TranslationHandler.ApplyDebugTranslations = function () {
         XrmTranslator.LockGrid("Applying debug translations...");
 
+        function randomSuffix3() {
+            var chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+            var suffix = "";
+
+            for (var i = 0; i < 3; i++) {
+                suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+
+            return suffix;
+        }
+
         return XrmTranslator.GetBaseLanguage()
         .then(function (baseLanguage) {
             var grid = XrmTranslator.GetGrid();
@@ -410,7 +421,7 @@
 
                 for (var j = 0; j < targetColumns.length; j++) {
                     var targetLcid = targetColumns[j];
-                    record.w2ui.changes[targetLcid] = sourceValue + " " + targetLcid;
+                    record.w2ui.changes[targetLcid] = sourceValue + " " + targetLcid + " " + randomSuffix3();
                     updates++;
                 }
 

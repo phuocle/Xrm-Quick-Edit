@@ -448,13 +448,9 @@
         })
         .then(function () {
             XrmTranslator.LockGrid("Publishing");
-            return XrmTranslator.SetBaseLanguage(XrmTranslator.userId)
-                .then(function () {
-                    return WebApiClient.Execute(WebApiClient.Requests.PublishAllXmlRequest);
-                })
-                .then(function () {
-                    return XrmTranslator.RestoreUserLanguage();
-                });
+            return XrmTranslator.RunAsBaseLanguage(function () {
+                return WebApiClient.Execute(WebApiClient.Requests.PublishAllXmlRequest);
+            });
         })
         .then(function () {
             return XrmTranslator.AddToSolution(
