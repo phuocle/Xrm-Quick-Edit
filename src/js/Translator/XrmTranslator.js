@@ -1039,6 +1039,52 @@
         }
     }
 
+    function ShowHelp () {
+        var html = '<div style="padding: 15px 20px; font-size: 13px; line-height: 1.8;">' +
+            '<b>Solution filter:</b> Selecting a Solution filters the Entity list to only show entities in that solution. ' +
+            'Use <i>Default Solution</i> to see all entities.' +
+            '<hr style="margin: 8px 0; border: none; border-top: 1px solid #ddd;">' +
+            '<b>Entity-based types</b> (select an Entity first):' +
+            '<ul style="margin: 4px 0 12px 0; padding-left: 20px;">' +
+            '<li><b>Attributes</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Attributes &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Options</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Options &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Forms</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Forms &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Views</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Views &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Form Metadata</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Form Metadata &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Entity Metadata</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Entity Metadata &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Relationships</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Relationships &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Charts</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Charts &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Business Process Flows</b> — Solution &rarr; Entity &rarr; <i>[entity]</i> &rarr; Type &rarr; Business Process Flows &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '</ul>' +
+            '<b>Entity-independent types</b> (set Entity to None):' +
+            '<ul style="margin: 4px 0 12px 0; padding-left: 20px;">' +
+            '<li><b>Global Option Sets</b> — Entity &rarr; None &rarr; Type &rarr; Global Option Sets &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Dashboards</b> — Entity &rarr; None &rarr; Type &rarr; Dashboards &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>Web Resources</b> — Entity &rarr; None &rarr; Type &rarr; Web Resources &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>SiteMap</b> — Entity &rarr; None &rarr; Type &rarr; SiteMap &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '</ul>' +
+            '<b>Special type:</b>' +
+            '<ul style="margin: 4px 0 0 0; padding-left: 20px;">' +
+            '<li><b>Content Snippets</b> — Entity &rarr; Adx_contentsnippet &rarr; Type &rarr; Content &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '</ul>' +
+            '</div>';
+
+        w2popup.open({
+            title: 'Translation Guide',
+            body: html,
+            width: 700,
+            height: 520,
+            modal: true,
+            showClose: true,
+            showMax: true,
+            onOpen: function (event) {
+                event.onComplete = function () {
+                    setTimeout(function () { w2popup.max(); }, 100);
+                };
+            }
+        });
+    }
+
     function LockAndLoad (entity, lock) {
         if (XrmTranslator.config.enableLocking && entity) {
             IsLockedForUser(entity)
@@ -1157,7 +1203,8 @@
                     { id: 'Description', text: 'Description', icon: 'fa-picture' }
                 ]
             },
-            { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: LoadHandler }
+            { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: LoadHandler },
+            { type: 'button', id: 'help', text: 'Help', img:'w2ui-icon-info' }
         ];
 
         $('#filterbar').w2toolbar({
@@ -1165,6 +1212,11 @@
             items: filterItems,
             onClick: function (event) {
                 var target = event.target;
+
+                if (target === "help") {
+                    ShowHelp();
+                    return;
+                }
 
                 if (target.startsWith("solutionSelect:")) {
                     var selectedSolutionId = target.replace("solutionSelect:", "");
