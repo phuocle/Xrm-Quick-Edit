@@ -2,3 +2,5 @@ node_modules/*
 Publish/*
 .mcp.json
 .env
+TestConsole/
+*.sln

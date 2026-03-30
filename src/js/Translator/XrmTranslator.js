@@ -194,6 +194,9 @@
         else if (XrmTranslator.GetType() === "relationships") {
             currentHandler = RelationshipHandler;
         }
+        else if (XrmTranslator.GetType() === "sitemap") {
+            currentHandler = SiteMapHandler;
+        }
         else if (XrmTranslator.GetType() === "charts") {
             currentHandler = ChartHandler;
         }
@@ -288,7 +291,7 @@
             var org = orgs.value[0];
 
             XrmTranslator.baseLanguage = org.languagecode;
-            
+
             return org.languagecode;
         });
     };
@@ -375,7 +378,7 @@
             })
             .catch(XrmTranslator.errorHandler);
     }
-  
+
     XrmTranslator.AddToSolution = function(componentIds, componentType, includeComponentSettings, includeSubComponents) {
         if (!XrmTranslator.config.solutionUniqueName) {
             return Promise.resolve(null);
@@ -395,7 +398,7 @@
                     DoNotIncludeSubcomponents: includeSubComponents ? false : true
                 }
             });
-            
+
             return WebApiClient.Execute(request);
         })
         .catch(XrmTranslator.errorHandler);
@@ -776,7 +779,7 @@
 
             languageItems.push({ id: availableLanguages[i].field, text: availableLanguages[i].caption });
         }
-        
+
         if (!w2ui.findAndReplace) {
             $().w2form({
                 name: 'findAndReplace',
@@ -835,7 +838,7 @@
         else {
             // Columns will be different when user switches to portal content snippet or back from it, we need to make sure columns always match current grid columns
             w2ui.findAndReplace.fields[4].options.items = languageItems;
-            
+
             w2ui.findAndReplace.refresh();
         }
 
@@ -888,27 +891,27 @@
 
     function DisableColumns() {
         XrmTranslator.GetGrid().toolbar.set("lockOrUnlock", { img: XrmTranslator.lockAcquired ? 'w2ui-icon-pencil' : 'w2ui-icon-cross' });
-        
+
         w2ui['grid_toolbar'].disable("autoTranslate");
         w2ui['grid_toolbar'].disable("findReplace");
- 
+
         XrmTranslator.GetGrid().columns.forEach(function(c) {
             if (c["editable"]) {
                 c["editableBackup"] = c["editable"]; delete c["editable"];
-            } 
+            }
         });
         XrmTranslator.GetGrid().refresh();
     }
 
     function EnableColumns() {
         XrmTranslator.GetGrid().toolbar.set("lockOrUnlock", { img: XrmTranslator.lockAcquired ? 'w2ui-icon-pencil' : 'w2ui-icon-cross' });
-        
+
         w2ui['grid_toolbar'].enable("autoTranslate");
         w2ui['grid_toolbar'].enable("findReplace");
 
-        XrmTranslator.GetGrid().columns.forEach(function(c) { 
-            if (c["editableBackup"]) { 
-                c["editable"] = c["editableBackup"]; delete c["editableBackup"]; 
+        XrmTranslator.GetGrid().columns.forEach(function(c) {
+            if (c["editableBackup"]) {
+                c["editable"] = c["editableBackup"]; delete c["editableBackup"];
             }
         });
         XrmTranslator.GetGrid().refresh();
@@ -923,7 +926,7 @@
             return Promise.resolve(null);
         }
 
-        return WebApiClient.Create({ 
+        return WebApiClient.Create({
             entityName: "oss_translationlock",
             entity: {
                 oss_name: entity,
@@ -1056,7 +1059,7 @@
             TriggerLoading(entity);
         }
     }
-    
+
     function TriggerLoading(entity) {
         let promise = undefined;
 
@@ -1130,6 +1133,7 @@
                     { id: 'formMeta', text: 'Form Metadata', icon: 'fa-picture' },
                     { id: 'entityMeta', text: 'Entity Metadata', icon: 'fa-picture' },
                     { id: 'relationships', text: 'Relationships', icon: 'fa-picture' },
+                    { id: 'sitemap', text: 'SiteMap', icon: 'fa-picture' },
                     { id: 'charts', text: 'Charts', icon: 'fa-picture' },
                     { id: 'bpf', text: 'Business Process Flows', icon: 'fa-picture' },
                     { id: 'content', text: 'Content', icon: 'fa-picture' },
@@ -1178,6 +1182,7 @@
 
                         w2ui['filterbar'].enable('type:webresources');
                         w2ui['filterbar'].enable('type:dashboards');
+                        w2ui['filterbar'].enable('type:sitemap');
                     }
                     else {
                         w2ui['filterbar'].enable('type:attributes');
@@ -1192,13 +1197,14 @@
 
                         w2ui['filterbar'].disable('type:webresources');
                         w2ui['filterbar'].disable('type:dashboards');
+                        w2ui['filterbar'].disable('type:sitemap');
                         w2ui['filterbar'].disable('type:content');
 
                         if (target === "entitySelect:Adx_contentsnippet") {
                             w2ui['filterbar'].enable('type:content');
                         }
 
-                        if (["content", "webresources", "dashboards"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
+                        if (["content", "webresources", "dashboards", "sitemap"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
                             w2ui.filterbar.get("type").selected = "attributes";
                             w2ui.filterbar.refresh();
                         }
@@ -1500,9 +1506,9 @@
 
     function FetchConfig() {
         return WebApiClient.Retrieve({ overriddenSetName: "webresourceset", entityId: "8AF4EAED-7454-E911-80FA-0050568E4745"})
-        .then(function (result) {           
+        .then(function (result) {
                 var config = JSON.parse(atob(result.content));
-                
+
                 XrmTranslator.config = config;
         });
     }
