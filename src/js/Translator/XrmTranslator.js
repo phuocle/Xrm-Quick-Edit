@@ -54,6 +54,7 @@
     var solutionEntityCache = {};
     var baseLanguageScopeDepth = 0;
     var baseLanguageRestoreLcid = null;
+    var unfilteredRecords = null;
 
 
 
@@ -946,6 +947,91 @@
         });
     }
 
+    function isRecordUntranslated(record, targetColumns) {
+        for (var i = 0; i < targetColumns.length; i++) {
+            var col = targetColumns[i];
+            var val;
+
+            if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, col)) {
+                val = record.w2ui.changes[col];
+            } else {
+                val = record[col];
+            }
+
+            if (!val) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function filterRecordsRecursive(records, targetColumns) {
+        var result = [];
+
+        for (var i = 0; i < records.length; i++) {
+            var rec = records[i];
+
+            if (rec.w2ui && rec.w2ui.summary) {
+                continue;
+            }
+
+            if (rec.w2ui && rec.w2ui.children) {
+                // Node with children: recurse, keep only if any leaf descendant is untranslated
+                var filteredChildren = filterRecordsRecursive(rec.w2ui.children, targetColumns);
+
+                if (filteredChildren.length > 0) {
+                    var clone = JSON.parse(JSON.stringify(rec));
+                    clone.w2ui.children = filteredChildren;
+                    result.push(clone);
+                }
+            } else {
+                // Leaf node: check if untranslated
+                if (isRecordUntranslated(rec, targetColumns)) {
+                    result.push(rec);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    function ToggleUntranslatedFilter() {
+        var grid = XrmTranslator.GetGrid();
+
+        if (!unfilteredRecords) {
+            // Activating: store originals and filter
+            var baseLcid = XrmTranslator.baseLanguage ? XrmTranslator.baseLanguage.toString() : null;
+            var targetColumns = XrmTranslator.GetColumns(false).map(function(c) { return String(c); });
+
+            if (baseLcid) {
+                targetColumns = targetColumns.filter(function(c) { return c !== baseLcid; });
+            }
+
+            if (targetColumns.length === 0) {
+                w2alert("No target language columns to filter on.");
+                return;
+            }
+
+            unfilteredRecords = JSON.parse(JSON.stringify(grid.records));
+
+            var filtered = filterRecordsRecursive(grid.records, targetColumns);
+
+            grid.clear();
+            grid.add(filtered);
+            XrmTranslator.AddSummary(filtered);
+            grid.refresh();
+        } else {
+            // Deactivating: restore originals
+            if (unfilteredRecords) {
+                grid.clear();
+                grid.add(unfilteredRecords);
+                unfilteredRecords = null;
+                grid.refresh();
+            }
+        }
+    }
+
     function IsLockedForUser(entity) {
         return WebApiClient.Retrieve({
             entityName: "oss_translationlock",
@@ -967,6 +1053,7 @@
 
         w2ui['grid_toolbar'].disable("aiTranslate");
         w2ui['grid_toolbar'].disable("findReplace");
+        w2ui['grid_toolbar'].disable("filterUntranslated");
 
         XrmTranslator.GetGrid().columns.forEach(function(c) {
             if (c["editable"]) {
@@ -981,6 +1068,7 @@
 
         w2ui['grid_toolbar'].enable("aiTranslate");
         w2ui['grid_toolbar'].enable("findReplace");
+        w2ui['grid_toolbar'].enable("filterUntranslated");
 
         XrmTranslator.GetGrid().columns.forEach(function(c) {
             if (c["editableBackup"]) {
@@ -1138,6 +1226,24 @@
             '<ul style="margin: 4px 0 0 0; padding-left: 20px;">' +
             '<li><b>Content Snippets</b> — Entity &rarr; Adx_contentsnippet &rarr; Type &rarr; Content &rarr; Load &rarr; Translate &rarr; Save</li>' +
             '</ul>' +
+            '<hr style="margin: 8px 0; border: none; border-top: 1px solid #ddd;">' +
+            '<b>AI Translate:</b>' +
+            '<ul style="margin: 4px 0 12px 0; padding-left: 20px;">' +
+            '<li><b>Auto Translate</b> — Uses an AI provider (Gemini or OpenAI) to translate labels from a source language to a target language. ' +
+            'Configure API keys via <i>AI Settings</i>.</li>' +
+            '<li><b>AI Settings</b> — Configure API keys, model names, and custom prompts for Google Gemini and OpenAI providers. ' +
+            'Settings are stored in your browser\'s localStorage.</li>' +
+            '</ul>' +
+            '<b>Dictionary:</b>' +
+            '<ul style="margin: 4px 0 12px 0; padding-left: 20px;">' +
+            '<li><b>Dictionary</b> — Open and manage translation dictionary entries (source &rarr; target term pairs). ' +
+            'When <i>Use Dictionary as First Priority</i> is enabled in Auto Translate, dictionary matches are applied before calling the AI provider.</li>' +
+            '<li><b>Apply Dictionary</b> — Batch-apply existing dictionary entries to all matching records in the current grid without calling AI. ' +
+            'Supports three modes: <i>All Overwrite</i>, <i>All Missing</i>, <i>All Missing Or Identical</i>.</li>' +
+            '<li><b>Storage:</b> Dictionary data is saved as a web resource (<code>oss_XrmQuickEdit/data/TranslationDictionary.xml</code>) ' +
+            'inside an unmanaged solution named <b>Xrm Quick Edit Data</b> (unique name: <code>XrmQuickEditData</code>). ' +
+            'This solution is auto-created on first use.</li>' +
+            '</ul>' +
             '</div>';
 
         w2popup.open({
@@ -1181,6 +1287,10 @@
     }
 
     function TriggerLoading(entity) {
+        unfilteredRecords = null;
+        var filterBtn = w2ui.grid_toolbar ? w2ui.grid_toolbar.get('filterUntranslated') : null;
+        if (filterBtn) { filterBtn.checked = false; w2ui.grid_toolbar.refresh(); }
+
         let promise = undefined;
 
         if (XrmTranslator.columnRestoreNeeded) {
@@ -1251,7 +1361,7 @@
                     { id: 'allInOne', text: 'All-In-One', icon: 'fa-camera' },
                     { id: 'entitySeparator', text: '--' },
                     { id: 'attributes', text: '1. Attributes', icon: 'fa-camera' },
-                    { id: 'options', text: '2. Options', icon: 'fa-picture' },
+                    { id: 'options', text: '2. Option Sets', icon: 'fa-picture' },
                     { id: 'forms', text: '3. Forms', icon: 'fa-picture' },
                     { id: 'views', text: '4. Views', icon: 'fa-picture' },
                     { id: 'formMeta', text: '5. Form Metadata', icon: 'fa-picture' },
@@ -1320,6 +1430,11 @@
                         w2ui['filterbar'].show('type:dashboards');
                         w2ui['filterbar'].show('type:sitemap');
                         w2ui['filterbar'].show('type:globalOptionSets');
+
+                        if (["allInOne", "attributes", "options", "forms", "views", "formMeta", "entityMeta", "relationships", "charts", "bpf", "content"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
+                            w2ui.filterbar.get("type").selected = "sitemap";
+                            w2ui.filterbar.refresh();
+                        }
                     }
                     else {
                         w2ui['filterbar'].show('type:allInOne');
@@ -1397,6 +1512,11 @@
             }
         } });
 
+        items.push({ type: 'break', id: 'break-filter' });
+        items.push({ type: 'check', id: 'filterUntranslated', img: 'icon-funnel', tooltip: 'Show only untranslated records', onClick: function () {
+            ToggleUntranslatedFilter();
+        } });
+
         if (XrmTranslator.config.enableLocking) {
             items.push({ type: 'menu-radio', id: 'lockOrUnlock', img: 'w2ui-icon-cross',
                 text: function (name, item) {
@@ -1409,8 +1529,9 @@
             });
         }
 
+        items.push({ type: 'spacer' });
+
         if (XrmTranslator.showDebugButton) {
-            items.push({ type: 'spacer' });
             items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', img:'icon-page', onClick: function () {
                 TranslationHandler.ApplyDebugTranslations();
             } });
@@ -1479,6 +1600,13 @@
             gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: 'Find and Replace', img:'icon-page', id: 'findReplace', onClick: function (event) {
                 OpenFindAndReplaceDialog();
             } });
+        }
+
+        // Move Save button to the far right (after DEBUG)
+        var saveBtn = gridToolbar.get('w2ui-save');
+        if (saveBtn) {
+            gridToolbar.remove('w2ui-save');
+            gridToolbar.add(saveBtn);
         }
 
         // Patch grid.lock/unlock to also cover the filterbar (toolbar1).

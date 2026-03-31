@@ -29,7 +29,7 @@
 
     var handlerTypes = [
         { type: "attributes", prefix: "attr~", number: 1, label: "Attributes",     handler: function() { return AttributeHandler; } },
-        { type: "options",    prefix: "opts~", number: 2, label: "Options",        handler: function() { return OptionSetHandler; } },
+        { type: "options",    prefix: "opts~", number: 2, label: "Option Sets",  handler: function() { return OptionSetHandler; } },
         // Forms (number 3) handled separately in Load/Save
         { type: "views",      prefix: "view~", number: 4, label: "Views",          handler: function() { return ViewHandler; } },
         { type: "formMeta",   prefix: "fmta~", number: 5, label: "Form Metadata",  handler: function() { return FormMetaHandler; } },
