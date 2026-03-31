@@ -1197,6 +1197,31 @@
         }
     }
 
+    function ShowAbout () {
+        var html = '<div style="padding: 20px 25px; font-size: 13px; line-height: 1.8; text-align: center;">' +
+            '<h2 style="margin: 0 0 5px 0;">Xrm Quick Edit</h2>' +
+            '<p style="margin: 0 0 15px 0; color: #888;">Translation Management for Dynamics 365 / Dataverse</p>' +
+            '<hr style="border: none; border-top: 1px solid #ddd; margin: 15px 0;">' +
+            '<p style="text-align: left;">This project is a fork of ' +
+            '<a href="https://github.com/XRM-OSS/Xrm-Quick-Edit" target="_blank" rel="noopener noreferrer">XRM-OSS/Xrm-Quick-Edit</a>. ' +
+            'Special thanks to the original author <a href="https://github.com/DigitalFlow" target="_blank" rel="noopener noreferrer">Florian Kr&ouml;nert (DigitalFlow)</a> ' +
+            'for creating and open-sourcing this tool.</p>' +
+            '<p style="text-align: left;">Continued development and enhancements by ' +
+            '<a href="https://github.com/phuocle" target="_blank" rel="noopener noreferrer">Phuoc Le</a>, ' +
+            'including AI-powered translation, dictionary management, All-In-One mode, and more.</p>' +
+            '</div>';
+
+        w2popup.open({
+            title: 'About',
+            body: html,
+            width: 500,
+            height: 320,
+            modal: true,
+            showClose: true,
+            buttons: '<button class="w2ui-btn" onclick="w2popup.close();">Close</button>'
+        });
+    }
+
     function ShowHelp () {
         var html = '<div style="padding: 15px 20px; font-size: 13px; line-height: 1.8;">' +
             '<b>Solution filter:</b> Selecting a Solution filters the Entity list to only show entities in that solution. ' +
@@ -1392,6 +1417,7 @@
             { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: LoadHandler },
             { type: 'spacer' },
             { type: 'break' },
+            { type: 'button', id: 'about', text: 'About', img:'icon-about' },
             { type: 'button', id: 'help', text: 'Help', img:'w2ui-icon-info' }
         ];
 
@@ -1400,6 +1426,11 @@
             items: filterItems,
             onClick: function (event) {
                 var target = event.target;
+
+                if (target === "about") {
+                    ShowAbout();
+                    return;
+                }
 
                 if (target === "help") {
                     ShowHelp();
