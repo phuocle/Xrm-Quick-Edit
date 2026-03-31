@@ -1,0 +1,64 @@
+.xqt-grid-theme {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 360px;
+  flex: 1;
+  width: 100%;
+  padding: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 249, 255, 0.92));
+  border-top: 1px solid #d0d7e5;
+  --ag-background-color: #fdfefe;
+  --ag-foreground-color: #1f2937;
+  --ag-header-background-color: #eff4fa;
+  --ag-header-foreground-color: #19324f;
+  --ag-border-color: #d4deeb;
+  --ag-row-border-color: #e2eaf3;
+  --ag-odd-row-background-color: #fafcff;
+  --ag-row-hover-color: #eaf5ff;
+  --ag-selected-row-background-color: rgba(14, 120, 209, 0.15);
+  --ag-font-family: "Segoe UI Variable", "Bahnschrift", "Trebuchet MS", sans-serif;
+  --ag-font-size: 14px;
+}
+
+.xqt-grid-theme .ag-root-wrapper {
+  border: 1px solid #d1dce9;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.xqt-grid-theme .ag-header-cell {
+  font-weight: 700;
+}
+
+.xqt-grid-theme .ag-header-cell-label {
+  letter-spacing: 0.01em;
+}
+
+.xqt-grid-theme .ag-row {
+  transition: background-color 120ms ease;
+}
+
+.xqt-grid-theme .ag-row.xqt-parent-row {
+  background: linear-gradient(90deg, rgba(14, 120, 209, 0.08), rgba(14, 120, 209, 0.02));
+  font-weight: 700;
+  color: #17385b;
+}
+
+.xqt-grid-theme .ag-row-hover {
+  background-color: #eaf5ff !important;
+}
+
+.xqt-grid-theme .ag-row-pinned {
+  background: linear-gradient(180deg, #edf3fb, #e7eff9) !important;
+  font-weight: 700;
+  border-top: 1px solid #c9d6e8;
+}
+
+.xqt-grid-theme .changed-cell {
+  background: linear-gradient(180deg, #fff8de, #fff2c9) !important;
+  box-shadow: inset 0 0 0 1px rgba(232, 164, 48, 0.72);
+  font-weight: 600;
+}

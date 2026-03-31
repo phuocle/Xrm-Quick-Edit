@@ -38,7 +38,8 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
-    backgroundColor: tokens.colorNeutralBackground1,
+    backgroundColor: '#e9f0f7',
+    backgroundImage: 'radial-gradient(circle at 0% 0%, rgba(14, 126, 205, 0.1), transparent 32%), radial-gradient(circle at 100% 100%, rgba(26, 143, 112, 0.1), transparent 36%)',
     overflow: 'hidden',
   },
   content: {
@@ -46,7 +47,12 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backdropFilter: 'blur(2px)',
+    margin: '10px',
+    borderRadius: '14px',
+    border: '1px solid #d3deea',
+    boxShadow: '0 14px 30px rgba(15, 23, 42, 0.08)',
   },
   centerMessage: {
     flex: 1,

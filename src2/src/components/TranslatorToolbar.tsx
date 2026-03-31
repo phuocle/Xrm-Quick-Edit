@@ -207,7 +207,7 @@ export const TranslatorToolbar: React.FC<ToolbarProps> = ({
           {isBusy ? 'Loading...' : 'Load'}
         </Toolbar.Button>
 
-        <Toolbar.Button className="xqt-toolbar-button" onClick={onSave} disabled={!canSave}>
+        <Toolbar.Button className={`xqt-toolbar-button ${hasChanges ? 'xqt-toolbar-save-alert' : ''}`} onClick={onSave} disabled={!canSave}>
           Save
         </Toolbar.Button>
       </div>
@@ -215,11 +215,11 @@ export const TranslatorToolbar: React.FC<ToolbarProps> = ({
       <div className="xqt-toolbar-separator" />
 
       <div className="xqt-toolbar-group">
-        <Toolbar.Button className="xqt-toolbar-button" onClick={onAutoTranslate} disabled={!hasData || isBusy}>
+        <Toolbar.Button className="xqt-toolbar-button xqt-toolbar-muted-action" onClick={onAutoTranslate} disabled={!hasData || isBusy}>
           Auto Translate
         </Toolbar.Button>
 
-        <Toolbar.Button className="xqt-toolbar-button" onClick={onFindReplace} disabled={!hasData || isBusy}>
+        <Toolbar.Button className="xqt-toolbar-button xqt-toolbar-muted-action" onClick={onFindReplace} disabled={!hasData || isBusy}>
           Find & Replace
         </Toolbar.Button>
       </div>

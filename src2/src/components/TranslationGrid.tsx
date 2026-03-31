@@ -1,10 +1,17 @@
 import React, { useMemo, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, CellValueChangedEvent, GridReadyEvent } from 'ag-grid-community';
+import type {
+  ColDef,
+  CellValueChangedEvent,
+  FirstDataRenderedEvent,
+  GridReadyEvent,
+  GridSizeChangedEvent,
+} from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
 import type { GridRow, CellChange } from '@/types/grid';
 import type { LanguageLocale } from '@/types/dataverse';
+import './TranslationGrid.css';
 
 interface TranslationGridProps {
   rows: GridRow[];
@@ -28,7 +35,7 @@ function flattenRows(rows: GridRow[], parentPath: string[] = []): FlatGridRow[] 
     const treePath = [...parentPath, row.schemaName];
     const visibleSchemaName = level === 0
       ? row.schemaName
-      : `${' '.repeat(level * 2)}↳ ${row.schemaName}`;
+      : `value = ${row.schemaName}`;
 
     result.push({ ...row, schemaName: visibleSchemaName, treePath });
     if (row.children) {
@@ -59,9 +66,9 @@ export const TranslationGrid: React.FC<TranslationGridProps> = ({
       {
         field: 'schemaName',
         headerName: 'Schema Name',
-        pinned: 'left',
         editable: false,
-        width: 250,
+        minWidth: 170,
+        flex: 1,
         lockPosition: true,
       },
     ];
@@ -78,7 +85,8 @@ export const TranslationGrid: React.FC<TranslationGridProps> = ({
 
           return !params.data.children || params.data.children.length === 0;
         },
-        width: 200,
+        minWidth: 120,
+        flex: 1,
         cellClassRules: {
           'changed-cell': (params) => {
             const original = params.data?._original?.[lang.localeid];
@@ -136,10 +144,21 @@ export const TranslationGrid: React.FC<TranslationGridProps> = ({
     onCellChange(change);
   }, [onCellChange]);
 
-  const onGridReady = useCallback((_event: GridReadyEvent) => {
-    // Auto-size columns on first load
-    // gridRef.current?.api.sizeColumnsToFit();
+  const fitColumns = useCallback(() => {
+    gridRef.current?.api.sizeColumnsToFit();
   }, []);
+
+  const onGridReady = useCallback((_event: GridReadyEvent) => {
+    fitColumns();
+  }, [fitColumns]);
+
+  const onFirstDataRendered = useCallback((_event: FirstDataRenderedEvent) => {
+    fitColumns();
+  }, [fitColumns]);
+
+  const onGridSizeChanged = useCallback((_event: GridSizeChangedEvent) => {
+    fitColumns();
+  }, [fitColumns]);
 
   const defaultColDef = useMemo<ColDef>(() => ({
     resizable: true,
@@ -150,38 +169,34 @@ export const TranslationGrid: React.FC<TranslationGridProps> = ({
   // Keep hierarchical rows flattened for compatibility with PPTB-hosted webview.
   const treeDataProps = {};
 
-  const gridThemeStyle = useMemo(() => ({
-    position: 'relative' as const,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    height: '100%',
-    minHeight: '360px',
-    flex: 1,
-    width: '100%',
-    backgroundColor: '#ffffff',
-    borderTop: '1px solid #d0d7de',
-    '--ag-background-color': '#ffffff',
-    '--ag-foreground-color': '#1f2937',
-    '--ag-header-background-color': '#f8fafc',
-    '--ag-header-foreground-color': '#1f2937',
-    '--ag-border-color': '#d0d7de',
-    '--ag-row-hover-color': '#eef6ff',
+  const rowClassRules = useMemo(() => ({
+    'xqt-parent-row': (params: { data?: FlatGridRow }) => {
+      if (!params.data || params.data.id === '__summary__') {
+        return false;
+      }
+
+      return !!params.data.children && params.data.children.length > 0;
+    },
   }), []);
 
   return (
-    <div className="ag-theme-quartz" style={gridThemeStyle}>
+    <div className="ag-theme-quartz xqt-grid-theme">
       <AgGridReact
         ref={gridRef}
         rowData={rowData}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}
+        rowClassRules={rowClassRules}
         pinnedBottomRowData={pinnedBottomRowData}
         onCellValueChanged={onCellValueChanged}
         onGridReady={onGridReady}
+        onFirstDataRendered={onFirstDataRendered}
+        onGridSizeChanged={onGridSizeChanged}
         loading={loading}
         overlayNoRowsTemplate="<span style='padding:8px;color:#475467;'>No data</span>"
         getRowId={(params) => params.data.id}
         animateRows={false}
+        suppressHorizontalScroll
         {...treeDataProps}
       />
       {!loading && rowData.length === 0 && (
