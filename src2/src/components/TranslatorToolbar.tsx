@@ -7,6 +7,7 @@ import type { MetadataComponent, TranslationType } from '@/types/grid';
 import './TranslatorToolbar.css';
 
 const NO_SOLUTION_FILTER = '__none__';
+const DASHBOARD_ENTITY = 'none';
 
 const typeOptions: { value: TranslationType; label: string }[] = [
   { value: 'attributes', label: 'Attributes' },
@@ -132,18 +133,32 @@ export const TranslatorToolbar: React.FC<ToolbarProps> = ({
     [solutions]
   );
 
-  const entityOptions = useMemo<SelectOption[]>(
-    () =>
-      entities.map(e => ({
-        value: e.logicalName,
-        label: `${e.displayName} (${e.logicalName})`,
-      })),
-    [entities]
-  );
+  const entityOptions = useMemo<SelectOption[]>(() => {
+    const options = entities.map(e => ({
+      value: e.logicalName,
+      label: `${e.displayName} (${e.logicalName})`,
+    }));
 
-  const canLoad = isInitialized && !!selectedEntity && !isBusy;
+    if (selectedType === 'formMeta') {
+      return [{ value: DASHBOARD_ENTITY, label: '(Dashboards - no entity)' }, ...options];
+    }
+
+    return options;
+  }, [entities, selectedType]);
+
+  const requiresEntity = selectedType !== 'globalOptionSets';
+  const canLoad = isInitialized && (!requiresEntity || !!selectedEntity) && !isBusy;
   const canSave = hasData && hasChanges && !isBusy;
   const controlsDisabled = !isInitialized || isBusy;
+
+  const handleTypeChange = (value: string) => {
+    const nextType = value as TranslationType;
+    setSelectedType(nextType);
+
+    if (selectedEntity === DASHBOARD_ENTITY && nextType !== 'formMeta') {
+      setSelectedEntity('');
+    }
+  };
 
   return (
     <Toolbar.Root className="xqt-toolbar" aria-label="Translation toolbar">
@@ -170,7 +185,7 @@ export const TranslatorToolbar: React.FC<ToolbarProps> = ({
           value={selectedType}
           placeholder="Type"
           options={typeOptions}
-          onValueChange={(value) => setSelectedType(value as TranslationType)}
+          onValueChange={handleTypeChange}
           disabled={controlsDisabled}
           widthClassName="xqt-select-type"
         />

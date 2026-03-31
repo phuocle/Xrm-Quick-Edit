@@ -5,6 +5,8 @@ import type {
   EntityMetadata,
   OneToManyRelationshipMetadata,
   ManyToManyRelationshipMetadata,
+  OptionSetMetadata,
+  SystemForm,
   LanguageLocale,
   UserSettings,
   Solution,
@@ -12,6 +14,7 @@ import type {
   LocalizedLabel,
   SavedQuery,
   SavedQueryVisualization,
+  UpdateOptionValueRequest,
 } from '@/types/dataverse';
 
 export interface EntityOption {
@@ -122,6 +125,46 @@ export const dataverseService = {
     }
   },
 
+  async getTypedAttributes(entityLogicalName: string, metadataType: string): Promise<AttributeMetadata[]> {
+    const relatedPath = `Attributes/Microsoft.Dynamics.CRM.${metadataType}?$expand=OptionSet,GlobalOptionSet`;
+
+    try {
+      const metadataResult = await (window.dataverseAPI.getEntityRelatedMetadata as unknown as (
+        entityLogicalName: string,
+        relatedPath: string
+      ) => Promise<{ value: Record<string, unknown>[] }>)(entityLogicalName, relatedPath);
+
+      return (metadataResult.value ?? []) as unknown as AttributeMetadata[];
+    } catch {
+      // Fall through to OData queryData path for environments where relatedPath with $expand is not supported.
+    }
+
+    const logicalName = escapeODataLiteral(entityLogicalName.toLowerCase());
+    const result = await window.dataverseAPI.queryData(
+      `EntityDefinitions(LogicalName='${logicalName}')/Attributes/Microsoft.Dynamics.CRM.${metadataType}?$expand=OptionSet,GlobalOptionSet`
+    );
+
+    return (result.value ?? []) as unknown as AttributeMetadata[];
+  },
+
+  async getAllOptionSetAttributes(entityLogicalName: string): Promise<AttributeMetadata[]> {
+    const logicalName = escapeODataLiteral(entityLogicalName.toLowerCase());
+    const result = await window.dataverseAPI.queryData(
+      `EntityDefinitions(LogicalName='${logicalName}')/Attributes?$select=MetadataId,LogicalName,SchemaName,AttributeType,AttributeTypeName,IsCustomizable&$expand=OptionSet,GlobalOptionSet`
+    );
+
+    return (result.value ?? []) as unknown as AttributeMetadata[];
+  },
+
+  async getGlobalOptionSets(): Promise<OptionSetMetadata[]> {
+    const result = await window.dataverseAPI.queryData('GlobalOptionSetDefinitions');
+    const optionSets = (result.value ?? []) as unknown as OptionSetMetadata[];
+
+    return optionSets
+      .filter(optionSet => optionSet.IsGlobal && optionSet.IsCustomizable?.Value !== false)
+      .sort((a, b) => (a.Name ?? '').localeCompare(b.Name ?? ''));
+  },
+
   async getEntityMetadata(entityLogicalName: string): Promise<EntityMetadata> {
     const result = await window.dataverseAPI.getEntityMetadata(
       entityLogicalName,
@@ -166,6 +209,17 @@ export const dataverseService = {
       `savedqueries?$select=savedqueryid,name,querytype,returnedtypecode&$filter=returnedtypecode eq '${logicalName}' and iscustomizable/Value eq true&$orderby=savedqueryid asc`
     );
     return (result.value ?? []) as unknown as SavedQuery[];
+  },
+
+  async getSystemForms(entityLogicalName: string): Promise<SystemForm[]> {
+    const isDashboardMode = entityLogicalName.toLowerCase() === 'none';
+
+    const query = isDashboardMode
+      ? "systemforms?$select=formid,name,type,objecttypecode&$filter=formactivationstate eq 1 and iscustomizable/Value eq true and (type eq 0 or type eq 10)&$orderby=type asc"
+      : `systemforms?$select=formid,name,type,objecttypecode&$filter=objecttypecode eq '${escapeODataLiteral(entityLogicalName.toLowerCase())}' and iscustomizable/Value eq true and formactivationstate eq 1&$orderby=type asc`;
+
+    const result = await window.dataverseAPI.queryData(query);
+    return (result.value ?? []) as unknown as SystemForm[];
   },
 
   async getSavedQueryVisualizations(entityLogicalName: string): Promise<SavedQueryVisualization[]> {
@@ -259,20 +313,41 @@ export const dataverseService = {
     await window.dataverseAPI.update(entityLogicalName, id, data);
   },
 
-  async updateOptionValue(params: {
-    EntityLogicalName: string;
-    AttributeLogicalName: string;
-    Value: number;
-    Label: Label;
-    Description?: Label;
-    MergeLabels: boolean;
-  }): Promise<void> {
-    await window.dataverseAPI.updateOptionValue(params);
+  async updateOptionValue(params: UpdateOptionValueRequest): Promise<void> {
+    await window.dataverseAPI.execute({
+      operationName: 'UpdateOptionValue',
+      operationType: 'action',
+      parameters: params as unknown as Record<string, unknown>,
+    });
   },
 
   async updateGlobalOptionSet(id: string, definition: unknown): Promise<void> {
     const clean = dataverseService.sanitizeForPut(definition as Record<string, unknown>);
     await window.dataverseAPI.updateGlobalOptionSet(id, clean, { mergeLabels: true });
+  },
+
+  async addSolutionComponents(params: {
+    componentIds: string[];
+    componentType: number;
+    solutionUniqueName: string;
+    includeComponentSettings?: boolean;
+    includeSubComponents?: boolean;
+    addRequiredComponents?: boolean;
+  }): Promise<void> {
+    for (const componentId of params.componentIds) {
+      await window.dataverseAPI.execute({
+        operationName: 'AddSolutionComponent',
+        operationType: 'action',
+        parameters: {
+          ComponentId: componentId,
+          ComponentType: params.componentType,
+          SolutionUniqueName: params.solutionUniqueName,
+          AddRequiredComponents: params.addRequiredComponents ?? false,
+          IncludedComponentSettingsValues: params.includeComponentSettings ? null : [],
+          DoNotIncludeSubcomponents: params.includeSubComponents ? false : true,
+        },
+      });
+    }
   },
 
   // ---- Language switching (for FormHandler) ----

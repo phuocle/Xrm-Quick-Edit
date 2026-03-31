@@ -26,6 +26,7 @@ export interface AttributeMetadata {
   IsRenameable?: { Value: boolean };
   FormulaDefinition?: string | null;  // Rollup fields co formula
   OptionSet?: OptionSetMetadata | null;
+  GlobalOptionSet?: OptionSetMetadata | null;
 }
 
 /** OptionSet metadata */
@@ -33,17 +34,31 @@ export interface OptionSetMetadata {
   MetadataId: string;
   Name: string;
   IsGlobal: boolean;
-  OptionSetType: string;
-  Options: OptionMetadata[];
+  IsCustomizable?: { Value: boolean };
+  OptionSetType?: string;
+  Options?: OptionMetadata[];
+  TrueOption?: OptionMetadata;
+  FalseOption?: OptionMetadata;
 }
 
 /** Option trong OptionSet */
 export interface OptionMetadata {
   Value: number;
-  Label: Label;
-  Description: Label;
+  Label?: Label;
+  Description?: Label;
   Color?: string;
   IsManaged: boolean;
+}
+
+/** Payload for UpdateOptionValue action (local and global option sets) */
+export interface UpdateOptionValueRequest {
+  Value: number;
+  MergeLabels: boolean;
+  Label?: Label;
+  Description?: Label;
+  EntityLogicalName?: string;
+  AttributeLogicalName?: string;
+  OptionSetName?: string;
 }
 
 /** Entity metadata */

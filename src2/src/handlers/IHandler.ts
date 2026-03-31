@@ -37,6 +37,7 @@ export interface ComponentOption {
 
 /** Context passed to handlers — subset of AppContext relevant to data operations */
 export interface HandlerContext {
+  userId: string;
   selectedType: TranslationType;
   entityLogicalName: string;
   selectedComponent: MetadataComponent;

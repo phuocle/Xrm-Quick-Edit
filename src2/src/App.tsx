@@ -46,6 +46,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
+    backgroundColor: '#f8fafc',
   },
   centerMessage: {
     flex: 1,
@@ -54,7 +55,8 @@ const useStyles = makeStyles({
     justifyContent: 'center',
     flexDirection: 'column',
     gap: tokens.spacingVerticalM,
-    color: tokens.colorNeutralForeground3,
+    color: '#475467',
+    backgroundColor: '#f8fafc',
   },
 });
 
@@ -64,8 +66,10 @@ function AppContent() {
   const [rows, setRows] = useState<GridRow[]>([]);
   const [changes, setChanges] = useState<Map<string, CellChange>>(new Map());
   const [isBusy, setIsBusy] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const buildHandlerContext = useCallback((): HandlerContext => ({
+    userId: ctx.userId,
     selectedType: ctx.selectedType,
     entityLogicalName: ctx.selectedEntity,
     selectedComponent: ctx.selectedComponent,
@@ -76,6 +80,7 @@ function AppContent() {
   }), [
     ctx.baseLanguage,
     ctx.installedLanguages,
+    ctx.userId,
     ctx.selectedComponent,
     ctx.selectedEntity,
     ctx.selectedSolution,
@@ -110,15 +115,17 @@ function AppContent() {
     setIsBusy(true);
     setRows([]);
     setChanges(new Map());
+    setHasLoadedOnce(false);
 
     try {
       const result = await handler.load(buildHandlerContext());
       setRows(result.rows);
+      setHasLoadedOnce(true);
 
       await window.toolboxAPI.utils.showNotification({
         title: 'Load complete',
         body: `Loaded ${result.rows.length} row(s).`,
-        type: 'success',
+        type: result.rows.length > 0 ? 'success' : 'warning',
         duration: 2500,
       });
     } catch (error) {
@@ -159,6 +166,7 @@ function AppContent() {
 
       const reloaded = await handler.load(buildHandlerContext());
       setRows(reloaded.rows);
+      setHasLoadedOnce(true);
       setChanges(new Map());
 
       await window.toolboxAPI.utils.showNotification({
@@ -232,20 +240,17 @@ function AppContent() {
         hasChanges={changes.size > 0}
         isBusy={isBusy || ctx.isLoading}
       />
-      {rows.length > 0 ? (
-        <TranslationGrid
-          rows={rows}
-          installedLanguages={ctx.installedLanguages}
-          baseLanguage={ctx.baseLanguage}
-          userLanguage={ctx.userLanguage}
-          onCellChange={handleCellChange}
-          loading={isBusy}
-        />
-      ) : (
-        <div className={styles.centerMessage}>
-          <Text size={400}>Select an entity and type, then click Load</Text>
-        </div>
-      )}
+      <TranslationGrid
+        rows={rows}
+        installedLanguages={ctx.installedLanguages}
+        baseLanguage={ctx.baseLanguage}
+        userLanguage={ctx.userLanguage}
+        onCellChange={handleCellChange}
+        loading={isBusy}
+        emptyMessage={hasLoadedOnce
+          ? 'No rows returned for this selection.'
+          : 'Select an entity and type, then click Load.'}
+      />
     </div>
   );
 }

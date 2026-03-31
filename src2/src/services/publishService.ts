@@ -56,6 +56,23 @@ export const publishService = {
     });
   },
 
+  async publishGlobalOptionSets(optionSetNames: string[]): Promise<void> {
+    if (optionSetNames.length === 0) {
+      return;
+    }
+
+    const optionSetXml = optionSetNames.map(name => `<optionset>${name}</optionset>`).join('');
+    const publishXml = `<importexportxml><optionsets>${optionSetXml}</optionsets></importexportxml>`;
+
+    await window.dataverseAPI.execute({
+      operationName: 'PublishXml',
+      operationType: 'action',
+      parameters: {
+        ParameterXml: publishXml,
+      },
+    });
+  },
+
   async publishAll(): Promise<void> {
     await window.dataverseAPI.execute({
       operationName: 'PublishAllXml',

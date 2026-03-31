@@ -1,14 +1,18 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import App from './App';
 import './index.css';
+
+// AG Grid v35+ requires explicit module registration.
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 // Ensure DOM is ready and root element exists
 const rootElement = document.getElementById('root');
 if (rootElement && !rootElement.hasAttribute('data-reactroot-initialized')) {
     // Mark as initialized to prevent double rendering
     rootElement.setAttribute('data-reactroot-initialized', 'true');
-    
+
     createRoot(rootElement).render(
         <StrictMode>
             <App />
