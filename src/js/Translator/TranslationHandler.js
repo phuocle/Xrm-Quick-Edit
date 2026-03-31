@@ -27,6 +27,7 @@
 
     var locales = null;
     var GEMINI_CONFIG_KEY = "XrmQuickEdit_GeminiConfig";
+    var OPENAI_CONFIG_KEY = "XrmQuickEdit_OpenAIConfig";
     var TRANSLATION_PROMPT_KEY = "XrmQuickEdit_TranslationPrompt";
     var translationProviders = [];
 
@@ -56,6 +57,19 @@
         localStorage.setItem(GEMINI_CONFIG_KEY, JSON.stringify(config));
     }
 
+    function GetOpenAIConfig() {
+        try {
+            var stored = localStorage.getItem(OPENAI_CONFIG_KEY);
+            return stored ? JSON.parse(stored) : { apiKey: "", modelName: "gpt-4o-mini", customPrompt: "" };
+        } catch(e) {
+            return { apiKey: "", modelName: "gpt-4o-mini", customPrompt: "" };
+        }
+    }
+
+    function SaveOpenAIConfig(config) {
+        localStorage.setItem(OPENAI_CONFIG_KEY, JSON.stringify(config));
+    }
+
     function normalizeBoolean(value, defaultValue) {
         if (value === undefined || value === null || value === "") {
             return defaultValue;
@@ -77,7 +91,6 @@
         return defaultValue;
     }
 
-    TranslationHandler.GetGeminiConfig = GetGeminiConfig;
 
     function GetLanguageIsoByLcid (lcid) {
         var locByLocales = locales.find(function(loc) { return loc.localeid === lcid; });
@@ -222,7 +235,7 @@
             var geminiConfig = GetGeminiConfig();
 
             if (!geminiConfig || !geminiConfig.apiKey) {
-                return "Gemini: API Key is missing. Please configure it via the Gemini Settings button.";
+                return "Gemini: API Key is missing. Please configure it via AI Settings.";
             }
 
             return null;
@@ -230,6 +243,112 @@
         create: function() {
             var geminiConfig = GetGeminiConfig();
             return new geminiTranslator(geminiConfig.apiKey, geminiConfig.modelName, geminiConfig.customPrompt);
+        }
+    });
+
+    const openAITranslator = function (apiKey, modelName, customPrompt) {
+        var apiUrl = "https://api.openai.com/v1/chat/completions";
+
+        this.GetBatchTranslations = function(fromLanguage, destLanguage, phrases) {
+            $.support.cors = true;
+
+            var systemPrompt = "You are a professional translator for a Microsoft Dynamics CRM / Dataverse system. " +
+                "Translate the following labels from " + fromLanguage + " to " + destLanguage + ". " +
+                (customPrompt ? customPrompt + " " : "") +
+                "Return ONLY a valid JSON array of translated strings in the exact same order as provided. " +
+                "Do not add any explanation, markdown formatting, or code fences. " +
+                "The array must have exactly " + phrases.length + " elements.";
+
+            var userMessage = JSON.stringify(phrases);
+
+            var requestBody = {
+                model: modelName,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: "Labels to translate:\n" + userMessage }
+                ]
+            };
+
+            return WebApiClient.Promise.resolve($.ajax({
+                url: apiUrl,
+                type: "POST",
+                crossDomain: true,
+                contentType: "application/json",
+                dataType: "json",
+                headers: {
+                    "Authorization": "Bearer " + apiKey
+                },
+                data: JSON.stringify(requestBody)
+            }))
+            .then(function(response) {
+                if (!response || !response.choices || !response.choices[0] ||
+                    !response.choices[0].message || !response.choices[0].message.content) {
+                    var errorMsg = (response && response.error && response.error.message) || "No translation returned";
+                    throw new Error("OpenAI API error: " + errorMsg);
+                }
+                var text = response.choices[0].message.content;
+                text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+
+                var translations = JSON.parse(text);
+
+                if (!Array.isArray(translations) || translations.length !== phrases.length) {
+                    throw new Error("OpenAI returned " + (translations ? translations.length : 0) +
+                        " translations but " + phrases.length + " were expected.");
+                }
+
+                return translations;
+            });
+        };
+
+        this.AddTranslations = function(fromLcid, destLcid, updateRecords, translatedPhrases) {
+            var translations = [];
+
+            for (var i = 0; i < updateRecords.length; i++) {
+                var translated = translatedPhrases[i];
+                var record = updateRecords[i];
+
+                if (!translated) {
+                    continue;
+                }
+
+                var translation = w2utils.encodeTags(translated);
+
+                translations.push({
+                    recid: record.recid,
+                    schemaName: record.schemaName,
+                    column: destLcid,
+                    source: record[fromLcid],
+                    translation: translation,
+                    fromDictionary: false
+                });
+            }
+
+            return translations;
+        };
+
+        this.CanTranslate = function(fromLcid, destLcid) {
+            return WebApiClient.Promise.resolve({
+                [fromLcid]: true,
+                [destLcid]: true
+            });
+        };
+    };
+
+    RegisterTranslationProvider({
+        id: "openai",
+        text: "OpenAI",
+        validate: function() {
+            var openAIConfig = GetOpenAIConfig();
+
+            if (!openAIConfig || !openAIConfig.apiKey) {
+                return "OpenAI: API Key is missing. Please configure it via AI Settings.";
+            }
+
+            return null;
+        },
+        create: function() {
+            var openAIConfig = GetOpenAIConfig();
+            return new openAITranslator(openAIConfig.apiKey, openAIConfig.modelName, openAIConfig.customPrompt);
         }
     });
 
@@ -746,27 +865,47 @@
         return key.substring(0, 5) + new Array(key.length - 4).join('*');
     }
 
-    function InitializeGeminiSettingsForm() {
-        var config = GetGeminiConfig();
-        var maskedKey = MaskApiKey(config.apiKey);
+    function InitializeAISettingsForm() {
+        var geminiConfig = GetGeminiConfig();
+        var openaiConfig = GetOpenAIConfig();
+        var maskedGeminiKey = MaskApiKey(geminiConfig.apiKey);
+        var maskedOpenaiKey = MaskApiKey(openaiConfig.apiKey);
 
-        if (!w2ui.geminiSettings) {
+        if (!w2ui.aiSettings) {
             $().w2form({
-                name: 'geminiSettings',
+                name: 'aiSettings',
                 style: 'border: 0px; background-color: transparent;',
+                tabs: [
+                    { id: 'tab-google', caption: 'Google' },
+                    { id: 'tab-openai', caption: 'OpenAI' }
+                ],
                 formHTML:
                     '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
                     '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
                     '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
-                    '        <input name="apiKey" type="password" style="flex: 1; width: 100%;"/>'+
+                    '        <input name="geminiApiKey" type="password" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
                     '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
                     '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
-                    '        <input name="modelName" type="text" style="flex: 1; width: 100%;"/>'+
+                    '        <input name="geminiModelName" type="text" style="flex: 1; width: 100%;"/>'+
                     '    </div>'+
                     '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
                     '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
-                    '        <textarea name="customPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
+                    '        <textarea name="geminiCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
+                    '    </div>'+
+                    '</div>'+
+                    '<div class="w2ui-page page-1" style="padding: 15px 25px;">'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
+                    '        <input name="openaiApiKey" type="password" style="flex: 1; width: 100%;"/>'+
+                    '    </div>'+
+                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
+                    '        <input name="openaiModelName" type="text" style="flex: 1; width: 100%;"/>'+
+                    '    </div>'+
+                    '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
+                    '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
+                    '        <textarea name="openaiCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -774,32 +913,47 @@
                     '    <button class="w2ui-btn" name="save">Save</button>'+
                     '</div>',
                 fields: [
-                    { field: 'apiKey', type: 'text', required: true },
-                    { field: 'modelName', type: 'text', required: true },
-                    { field: 'customPrompt', type: 'text', required: false }
+                    { field: 'geminiApiKey', type: 'text', html: { page: 0 } },
+                    { field: 'geminiModelName', type: 'text', html: { page: 0 } },
+                    { field: 'geminiCustomPrompt', type: 'text', html: { page: 0 } },
+                    { field: 'openaiApiKey', type: 'text', html: { page: 1 } },
+                    { field: 'openaiModelName', type: 'text', html: { page: 1 } },
+                    { field: 'openaiCustomPrompt', type: 'text', html: { page: 1 } }
                 ],
                 record: {
-                    apiKey: maskedKey,
-                    modelName: config.modelName || "gemini-2.0-flash",
-                    customPrompt: config.customPrompt || ""
+                    geminiApiKey: maskedGeminiKey,
+                    geminiModelName: geminiConfig.modelName || "gemini-2.0-flash",
+                    geminiCustomPrompt: geminiConfig.customPrompt || "",
+                    openaiApiKey: maskedOpenaiKey,
+                    openaiModelName: openaiConfig.modelName || "gpt-4o-mini",
+                    openaiCustomPrompt: openaiConfig.customPrompt || ""
                 },
                 actions: {
                     "save": function () {
-                        if (this.validate().length > 0) {
-                            return;
-                        }
-                        var currentConfig = GetGeminiConfig();
-                        var apiKeyToSave = this.record.apiKey;
-                        if (apiKeyToSave.indexOf("*") !== -1 && currentConfig && currentConfig.apiKey) {
-                            apiKeyToSave = currentConfig.apiKey;
+                        var currentGemini = GetGeminiConfig();
+                        var geminiKeyToSave = this.record.geminiApiKey;
+                        if (geminiKeyToSave && geminiKeyToSave.indexOf("*") !== -1 && currentGemini && currentGemini.apiKey) {
+                            geminiKeyToSave = currentGemini.apiKey;
                         }
                         SaveGeminiConfig({
-                            apiKey: apiKeyToSave,
-                            modelName: this.record.modelName,
-                            customPrompt: this.record.customPrompt
+                            apiKey: geminiKeyToSave || "",
+                            modelName: this.record.geminiModelName || "gemini-2.0-flash",
+                            customPrompt: this.record.geminiCustomPrompt || ""
                         });
+
+                        var currentOpenai = GetOpenAIConfig();
+                        var openaiKeyToSave = this.record.openaiApiKey;
+                        if (openaiKeyToSave && openaiKeyToSave.indexOf("*") !== -1 && currentOpenai && currentOpenai.apiKey) {
+                            openaiKeyToSave = currentOpenai.apiKey;
+                        }
+                        SaveOpenAIConfig({
+                            apiKey: openaiKeyToSave || "",
+                            modelName: this.record.openaiModelName || "gpt-4o-mini",
+                            customPrompt: this.record.openaiCustomPrompt || ""
+                        });
+
                         w2popup.close();
-                        w2alert("Gemini settings saved successfully.");
+                        w2alert("AI settings saved successfully.");
                     },
                     "cancel": function () {
                         w2popup.close();
@@ -808,41 +962,197 @@
             });
         }
         else {
-            w2ui.geminiSettings.record = {
-                apiKey: maskedKey,
-                modelName: config.modelName || "gemini-2.0-flash",
-                customPrompt: config.customPrompt || ""
+            w2ui.aiSettings.record = {
+                geminiApiKey: maskedGeminiKey,
+                geminiModelName: geminiConfig.modelName || "gemini-2.0-flash",
+                geminiCustomPrompt: geminiConfig.customPrompt || "",
+                openaiApiKey: maskedOpenaiKey,
+                openaiModelName: openaiConfig.modelName || "gpt-4o-mini",
+                openaiCustomPrompt: openaiConfig.customPrompt || ""
             };
-            w2ui.geminiSettings.refresh();
+            w2ui.aiSettings.refresh();
         }
 
         return Promise.resolve({});
     }
 
-    TranslationHandler.ShowGeminiSettings = function() {
-        InitializeGeminiSettingsForm()
+    TranslationHandler.ShowAISettings = function() {
+        InitializeAISettingsForm()
         .then(function() {
             $().w2popup('open', {
-                title   : 'Gemini AI Translation Settings',
-                name    : 'geminiSettingsPopup',
+                title   : 'AI Translation Settings',
+                name    : 'aiSettingsPopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
                 style   : 'padding: 15px 0px 0px 0px',
                 width   : 650,
-                height  : 350,
+                height  : 420,
                 showMax : true,
                 onToggle: function (event) {
-                    $(w2ui.geminiSettings.box).hide();
+                    $(w2ui.aiSettings.box).hide();
                     event.onComplete = function () {
-                        $(w2ui.geminiSettings.box).show();
-                        w2ui.geminiSettings.resize();
+                        $(w2ui.aiSettings.box).show();
+                        w2ui.aiSettings.resize();
                     }
                 },
                 onOpen: function (event) {
                     event.onComplete = function () {
-                        $('#w2ui-popup #form').w2render('geminiSettings');
+                        $('#w2ui-popup #form').w2render('aiSettings');
                     }
                 }
             });
+        });
+    }
+
+    TranslationHandler.ShowApplyDictionaryPrompt = function() {
+        var applyModeItems = [
+            { id: "overwrite", text: "All Overwrite" },
+            { id: "missing", text: "All Missing" },
+            { id: "missingOrIdentical", text: "All Missing Or Identical" }
+        ];
+
+        if (!w2ui.applyDictionaryPrompt) {
+            $().w2form({
+                name: 'applyDictionaryPrompt',
+                style: 'border: 0px; background-color: transparent;',
+                formHTML:
+                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
+                    '    <p style="margin: 0 0 15px 0; color: #555;">Apply existing dictionary entries to all matching records in the current grid.</p>'+
+                    '    <div style="display: flex; align-items: center;">'+
+                    '        <label style="min-width: 80px; white-space: nowrap;">Mode:</label>'+
+                    '        <input name="applyMode" type="list" style="flex: 1; width: 100%;"/>'+
+                    '    </div>'+
+                    '</div>'+
+                    '<div class="w2ui-buttons">'+
+                    '    <button class="w2ui-btn" name="cancel">Cancel</button>'+
+                    '    <button class="w2ui-btn" name="ok">Ok</button>'+
+                    '</div>',
+                fields: [
+                    { field: 'applyMode', type: 'list', required: true, options: { items: applyModeItems } }
+                ],
+                record: {
+                    applyMode: applyModeItems[0]
+                },
+                actions: {
+                    "ok": function () {
+                        if (this.validate().length > 0) return;
+                        var mode = this.record.applyMode ? this.record.applyMode.id : "overwrite";
+                        w2popup.close();
+                        ApplyDictionaryToGrid(mode);
+                    },
+                    "cancel": function () {
+                        w2popup.close();
+                    }
+                }
+            });
+        } else {
+            w2ui.applyDictionaryPrompt.record = { applyMode: applyModeItems[0] };
+            w2ui.applyDictionaryPrompt.refresh();
+        }
+
+        $().w2popup('open', {
+            title   : 'Apply Dictionary',
+            name    : 'applyDictionaryPopup',
+            body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
+            style   : 'padding: 15px 0px 0px 0px',
+            width   : 520,
+            height  : 220,
+            showMax : false,
+            onToggle: function (event) {
+                $(w2ui.applyDictionaryPrompt.box).hide();
+                event.onComplete = function () {
+                    $(w2ui.applyDictionaryPrompt.box).show();
+                    w2ui.applyDictionaryPrompt.resize();
+                }
+            },
+            onOpen: function (event) {
+                event.onComplete = function () {
+                    $('#w2ui-popup #form').w2render('applyDictionaryPrompt');
+                }
+            }
+        });
+    }
+
+    function ApplyDictionaryToGrid(mode) {
+        if (!window.TranslationDictionaryService || !TranslationDictionaryService.SplitRecordsByDictionary) {
+            w2alert("Dictionary service is not available.");
+            return;
+        }
+
+        XrmTranslator.LockGrid("Applying dictionary...");
+
+        XrmTranslator.GetBaseLanguage()
+        .then(function(baseLanguage) {
+            var baseLcid = String(baseLanguage);
+            var targetLcids = XrmTranslator.GetColumns(false).filter(function(c) { return String(c) !== baseLcid; });
+
+            if (!targetLcids.length) {
+                XrmTranslator.UnlockGrid();
+                w2alert("No target language columns found.");
+                return;
+            }
+
+            var allRecords = XrmTranslator.GetAllRecords();
+
+            function getCurrentValue(record, lcid) {
+                if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, lcid)) {
+                    return record.w2ui.changes[lcid];
+                }
+                return record[lcid] || record[String(lcid)];
+            }
+
+            var promises = targetLcids.map(function(targetLcid) {
+                var filteredRecords = allRecords.filter(function(record) {
+                    var sourceVal = getCurrentValue(record, baseLcid);
+                    var targetVal = getCurrentValue(record, targetLcid);
+
+                    if (!sourceVal) return false;
+
+                    if (mode === "missing") return !targetVal;
+                    if (mode === "missingOrIdentical") return !targetVal || sourceVal === targetVal;
+                    return true; // overwrite
+                });
+
+                if (!filteredRecords.length) {
+                    return Promise.resolve([]);
+                }
+
+                return TranslationDictionaryService.SplitRecordsByDictionary(baseLcid, targetLcid, filteredRecords)
+                .then(function(split) {
+                    return split.matchedResults || [];
+                });
+            });
+
+            return Promise.all(promises)
+            .then(function(resultsPerLang) {
+                var grid = XrmTranslator.GetGrid();
+                var totalApplied = 0;
+
+                for (var i = 0; i < resultsPerLang.length; i++) {
+                    var results = resultsPerLang[i];
+                    for (var j = 0; j < results.length; j++) {
+                        var result = results[j];
+                        var record = XrmTranslator.GetByRecId(allRecords, result.recid);
+                        if (!record) continue;
+
+                        if (!record.w2ui) record.w2ui = {};
+                        if (!record.w2ui.changes) record.w2ui.changes = {};
+
+                        record.w2ui.changes[result.column] = result.translation;
+                        totalApplied++;
+                        grid.refreshRow(record.recid);
+                    }
+                }
+
+                if (totalApplied > 0) {
+                    XrmTranslator.SetSaveButtonDisabled(false);
+                }
+
+                XrmTranslator.UnlockGrid();
+                w2alert("Applied " + totalApplied + " dictionary translation(s).");
+            });
+        })
+        .catch(function(error) {
+            XrmTranslator.errorHandler(error);
         });
     }
 

@@ -1,0 +1,12 @@
+/* Shared styles for Xrm Quick Edit dashboards */
+
+/* Match filterbar appearance to the w2ui grid toolbar */
+#filterbar {
+    background-color: #eaeaea;
+    box-shadow: 0 1px 2px #ddd;
+    padding: 6px 1px 4px;
+}
+
+#filterbar .w2ui-toolbar {
+    background-color: transparent;
+}

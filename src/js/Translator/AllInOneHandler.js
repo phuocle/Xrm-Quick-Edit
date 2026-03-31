@@ -97,6 +97,22 @@
         }
     }
 
+    function getAllInOneFormGroupLabel(formData) {
+        var typeName = formData && formData.formTypeName ? String(formData.formTypeName).trim() : "Form";
+        var formName = formData && formData.formName ? String(formData.formName).trim() : "";
+
+        var label = typeName;
+        if (label.toLowerCase().indexOf("form") === -1) {
+            label += " Form";
+        }
+
+        if (formName) {
+            label += " - " + formName;
+        }
+
+        return label;
+    }
+
     function captureGridRecords() {
         var grid = XrmTranslator.GetGrid();
         var records = grid.records.filter(function(r) { return !r.w2ui || !r.w2ui.summary; });
@@ -252,7 +268,7 @@
                     // Each form is a sub-group under "3. Forms"
                     formChildren.push({
                         recid: formPrefix + "_group",
-                        schemaName: fd.formName,
+                        schemaName: getAllInOneFormGroupLabel(fd),
                         _isGroupNode: true,
                         _allInOneType: formPrefix,
                         w2ui: {
@@ -292,7 +308,11 @@
             allGroups.sort(function(a, b) { return a.number - b.number; });
             var allRecords = allGroups.map(function(g) { return g.node; });
             grid.add(allRecords);
-            grid.unlock();
+            XrmTranslator.UnlockGrid();
+        })
+        .catch(function(err) {
+            grid.unlock = originalUnlock;
+            XrmTranslator.errorHandler(err);
         });
 
         return chain;
@@ -302,18 +322,6 @@
 
     AllInOneHandler.Save = function() {
         var grid = XrmTranslator.GetGrid();
-        var filterbarEl = $("#filterbar");
-        var originalFilterbarPointerEvents = filterbarEl.css("pointer-events");
-        var originalFilterbarOpacity = filterbarEl.css("opacity");
-
-        function restoreFilterbarInteraction() {
-            filterbarEl.css("pointer-events", originalFilterbarPointerEvents || "");
-            filterbarEl.css("opacity", originalFilterbarOpacity || "");
-        }
-
-        // During All-In-One save, block the top filter toolbar to prevent state changes mid-flight.
-        filterbarEl.css("pointer-events", "none");
-        filterbarEl.css("opacity", "0.8");
 
         XrmTranslator.LockGrid("Saving ......");
 
@@ -406,11 +414,7 @@
         .then(function() {
             return AllInOneHandler.Load();
         })
-        .then(function() {
-            restoreFilterbarInteraction();
-        })
         .catch(function(err) {
-            restoreFilterbarInteraction();
             XrmTranslator.errorHandler(err);
         });
 

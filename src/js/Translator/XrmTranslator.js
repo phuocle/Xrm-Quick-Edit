@@ -55,6 +55,8 @@
     var baseLanguageScopeDepth = 0;
     var baseLanguageRestoreLcid = null;
 
+
+
     RegExp.escape= function(s) {
         return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     };
@@ -273,11 +275,17 @@
     };
 
     XrmTranslator.LockGrid = function (message) {
-        XrmTranslator.GetGrid().lock(message, true);
+        var grid = w2ui && w2ui.grid ? w2ui.grid : null;
+        if (grid) {
+            grid.lock(message, true);
+        }
     };
 
     XrmTranslator.UnlockGrid = function () {
-        XrmTranslator.GetGrid().unlock();
+        var grid = w2ui && w2ui.grid ? w2ui.grid : null;
+        if (grid) {
+            grid.unlock();
+        }
     };
 
     XrmTranslator.SetUserLanguage = function (userId, language) {
@@ -957,7 +965,7 @@
     function DisableColumns() {
         XrmTranslator.GetGrid().toolbar.set("lockOrUnlock", { img: XrmTranslator.lockAcquired ? 'w2ui-icon-pencil' : 'w2ui-icon-cross' });
 
-        w2ui['grid_toolbar'].disable("autoTranslate");
+        w2ui['grid_toolbar'].disable("aiTranslate");
         w2ui['grid_toolbar'].disable("findReplace");
 
         XrmTranslator.GetGrid().columns.forEach(function(c) {
@@ -971,7 +979,7 @@
     function EnableColumns() {
         XrmTranslator.GetGrid().toolbar.set("lockOrUnlock", { img: XrmTranslator.lockAcquired ? 'w2ui-icon-pencil' : 'w2ui-icon-cross' });
 
-        w2ui['grid_toolbar'].enable("autoTranslate");
+        w2ui['grid_toolbar'].enable("aiTranslate");
         w2ui['grid_toolbar'].enable("findReplace");
 
         XrmTranslator.GetGrid().columns.forEach(function(c) {
@@ -1270,7 +1278,10 @@
                     { id: 'Description', text: 'Description', icon: 'fa-picture' }
                 ]
             },
+            { type: 'break' },
             { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: LoadHandler },
+            { type: 'spacer' },
+            { type: 'break' },
             { type: 'button', id: 'help', text: 'Help', img:'w2ui-icon-info' }
         ];
 
@@ -1362,14 +1373,22 @@
             }}
         ];
 
+        var aiTranslateMenuItems = [];
+
         if (!XrmTranslator.config.hideAutoTranslate) {
-            items.push({ type: 'button', id: 'autoTranslate', text: 'Auto Translate', img:'icon-page', onClick: function (event) {
-                TranslationHandler.ShowTranslationPrompt();
-            } });
+            aiTranslateMenuItems.push({ id: 'autoTranslate', text: 'Auto Translate', icon: 'icon-page' });
         }
 
-        items.push({ type: 'button', id: 'geminiSettings', text: 'Gemini Settings', img:'icon-page', onClick: function (event) {
-            TranslationHandler.ShowGeminiSettings();
+        aiTranslateMenuItems.push({ id: 'aiSettings', text: 'AI Settings', icon: 'icon-page' });
+
+        items.push({ type: 'menu', id: 'aiTranslate', text: 'AI Translate', img: 'icon-page',
+            items: aiTranslateMenuItems
+        });
+
+        items.push({ type: 'break' });
+
+        items.push({ type: 'button', id: 'applyDictionary', text: 'Apply Dictionary', img:'icon-page', onClick: function () {
+            TranslationHandler.ShowApplyDictionaryPrompt();
         } });
 
         items.push({ type: 'button', id: 'dictionary', text: 'Dictionary', img:'icon-page', onClick: function () {
@@ -1377,12 +1396,6 @@
                 TranslationDictionaryService.ShowDictionaryPrompt();
             }
         } });
-
-        if (XrmTranslator.showDebugButton) {
-            items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', img:'icon-page', onClick: function () {
-                TranslationHandler.ApplyDebugTranslations();
-            } });
-        }
 
         if (XrmTranslator.config.enableLocking) {
             items.push({ type: 'menu-radio', id: 'lockOrUnlock', img: 'w2ui-icon-cross',
@@ -1396,17 +1409,10 @@
             });
         }
 
-        items.push({ type: 'menu', id: 'toggle', img: 'icon-folder',
-            text: "Toggle",
-            items: [
-                { type: 'button', text: 'Expand all records', id: 'expandAll' },
-                { type: 'button', text: 'Collapse all records', id: 'collapseAll' }
-            ]
-        });
-
-        if (!XrmTranslator.config.hideFindAndReplace) {
-            items.push({ type: 'button', text: 'Find and Replace', img:'icon-page', id: 'findReplace', onClick: function (event) {
-                OpenFindAndReplaceDialog();
+        if (XrmTranslator.showDebugButton) {
+            items.push({ type: 'spacer' });
+            items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', img:'icon-page', onClick: function () {
+                TranslationHandler.ApplyDebugTranslations();
             } });
         }
 
@@ -1440,6 +1446,12 @@
                     }
 
                     switch(event.target) {
+                        case "aiTranslate:autoTranslate":
+                            TranslationHandler.ShowTranslationPrompt();
+                            break;
+                        case "aiTranslate:aiSettings":
+                            TranslationHandler.ShowAISettings();
+                            break;
                         case "lockOrUnlock:lock":
                             LockAndLoad(XrmTranslator.GetEntity(), true);
                             break;
@@ -1450,6 +1462,55 @@
                 }
             }
         });
+
+        // Insert items before built-in grid toolbar items
+        var gridToolbar = w2ui['grid_toolbar'];
+
+        gridToolbar.insert('w2ui-reload', { type: 'menu', id: 'toggle', img: 'icon-folder',
+            text: "Toggle",
+            items: [
+                { type: 'button', text: 'Expand all records', id: 'expandAll' },
+                { type: 'button', text: 'Collapse all records', id: 'collapseAll' }
+            ]
+        });
+        gridToolbar.insert('w2ui-reload', { type: 'break', id: 'break-toggle' });
+
+        if (!XrmTranslator.config.hideFindAndReplace) {
+            gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: 'Find and Replace', img:'icon-page', id: 'findReplace', onClick: function (event) {
+                OpenFindAndReplaceDialog();
+            } });
+        }
+
+        // Patch grid.lock/unlock to also cover the filterbar (toolbar1).
+        // This way ANY call to grid.unlock() from any handler automatically unlocks both.
+        var _grid = w2ui.grid;
+        var _origLock = _grid.lock.bind(_grid);
+        var _origUnlock = _grid.unlock.bind(_grid);
+        var _filterbar = $("#filterbar");
+
+        // Create an overlay div matching w2ui's .w2ui-lock style
+        var _filterbarLock = $('<div>').css({
+            display: "none",
+            position: "absolute",
+            zIndex: 10,
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0,0,0,0.1)",
+            pointerEvents: "auto"
+        });
+        _filterbar.css("position", "relative").append(_filterbarLock);
+
+        _grid.lock = function(msg, showSpinner) {
+            _origLock(msg, showSpinner);
+            _filterbarLock.show();
+        };
+
+        _grid.unlock = function() {
+            _origUnlock();
+            _filterbarLock.hide();
+        };
 
         XrmTranslator.LockGrid("Loading entities");
     }
@@ -1549,7 +1610,9 @@
             w2ui.filterbar.refresh();
             XrmTranslator.UnlockGrid();
         })
-        .catch(XrmTranslator.errorHandler);
+        .catch(function(error) {
+            XrmTranslator.errorHandler(error);
+        });
     }
 
     function GetUserId() {
@@ -1729,6 +1792,8 @@
         .then(function () {
             XrmTranslator.UnlockGrid();
         })
-        .catch(XrmTranslator.errorHandler);
+        .catch(function (error) {
+            XrmTranslator.errorHandler(error);
+        });
     }
 } (window.XrmTranslator = window.XrmTranslator || {}));

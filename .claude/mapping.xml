@@ -2,6 +2,7 @@
 <Mapping SolutionName="XrmQuickEdit">
   <!-- CSS -->
   <File LocalPath="src/lib/w2ui-1.5.rc1.min.css" UniqueName="oss_/XrmQuickEdit/css/w2ui.css" />
+  <File LocalPath="src/css/style.css" UniqueName="oss_/XrmQuickEdit/css/style.css" />
 
   <!-- HTML -->
   <File LocalPath="src/html/PropertyEditorGrid.html" UniqueName="oss_/XrmQuickEdit/html/PropertyEditorGrid.html" />

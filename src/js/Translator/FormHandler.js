@@ -170,15 +170,25 @@
             }
         };
 
-        if (XrmTranslator.config.lockFormCells && name.toLowerCase() === "cell") {
-            gridNode.w2ui.editable = false;
-        }
-
         AttachLabels(node, gridNode);
 
         for (var i = 0; i < FormHandler.selectedForms.length; i++) {
             var node = GetById(node.id, FormHandler.selectedForms[i]);
             AttachLabels(node, gridNode);
+        }
+
+        if (XrmTranslator.config.lockFormCells && name.toLowerCase() === "cell") {
+            var hasLabels = Object.keys(gridNode).some(function (key) {
+                if (key === "recid" || key === "schemaName" || key === "w2ui") {
+                    return false;
+                }
+
+                return !!String(gridNode[key] || "").trim();
+            });
+
+            if (!hasLabels) {
+                gridNode.w2ui.editable = false;
+            }
         }
 
         return gridNode;
@@ -245,6 +255,17 @@
     FormHandler.LoadAllForms = function () {
         var entityName = XrmTranslator.GetEntity();
 
+        var formTypeMap = {
+            0: "Dashboard",
+            2: "Main",
+            5: "Mobile Express",
+            6: "Quick View",
+            7: "Quick Create",
+            10: "App Module Main",
+            11: "Interactive Experience",
+            12: "Card"
+        };
+
         var formRequest = {
             entityName: "systemform",
             queryParams: "?$filter=objecttypecode eq '" + entityName.toLowerCase() + "' and iscustomizable/Value eq true and formactivationstate eq 1"
@@ -310,6 +331,8 @@
                 allFormData.push({
                     formId: form.formid,
                     formName: form.name || form.formid,
+                    formType: form.type,
+                    formTypeName: formTypeMap[form.type] || ("Type " + form.type),
                     metadata: JSON.parse(JSON.stringify(XrmTranslator.metadata)),
                     selectedForms: FormHandler.selectedForms ? FormHandler.selectedForms.slice() : [],
                     records: JSON.parse(JSON.stringify(records))
