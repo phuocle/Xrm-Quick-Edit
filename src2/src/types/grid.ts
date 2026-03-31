@@ -49,6 +49,11 @@ export type TranslationType =
   | 'webresources'
   | 'allInOne';
 
+/** Metadata label component selector used by multiple handlers */
+export type MetadataComponent =
+  | 'DisplayName'
+  | 'Description';
+
 /** Property editor property type */
 export type PropertyType =
   | 'attributes'

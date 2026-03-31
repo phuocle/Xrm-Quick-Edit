@@ -1,176 +1,280 @@
-import React, { useCallback, useEffect } from 'react';
-import { FluentProvider, webLightTheme, webDarkTheme, Toolbar, ToolbarButton, Title3, Text, makeStyles, tokens } from '@fluentui/react-components';
-import { CheckmarkCircle24Regular, Info24Regular, Warning24Regular, DismissCircle24Regular } from '@fluentui/react-icons';
-import { ConnectionStatus } from './components/ConnectionStatus';
-import { DataverseAPIDemo } from './components/DataverseAPIDemo';
-import { EventLog } from './components/EventLog';
-import { ToolboxAPIDemo } from './components/ToolboxAPIDemo';
-import { useConnection, useEventLog, useToolboxEvents } from './hooks/useToolboxAPI';
+import { Component, useCallback, useEffect, useState } from 'react';
+import type { ReactNode, ErrorInfo } from 'react';
+import { FluentProvider, webLightTheme, webDarkTheme, makeStyles, tokens, Text, Spinner } from '@fluentui/react-components';
+import { AppProvider, useAppContext } from '@/context/AppContext';
+import { TranslatorToolbar } from '@/components/TranslatorToolbar';
+import { TranslationGrid } from '@/components/TranslationGrid';
+import type { GridRow, CellChange } from '@/types/grid';
+import type { HandlerContext } from '@/handlers/IHandler';
+import { getHandler } from '@/handlers/handlerFactory';
+
+// Error boundary to prevent full-page crashes
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  state = { error: null as string | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error: error.message };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('React error boundary caught:', error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 24, color: '#d32f2f' }}>
+          <h3>Something went wrong</h3>
+          <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const useStyles = makeStyles({
-    root: {
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        backgroundColor: tokens.colorNeutralBackground1,
-        overflow: 'hidden',
-    },
-    header: {
-        padding: tokens.spacingVerticalL,
-        paddingBottom: tokens.spacingVerticalS,
-        borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: tokens.spacingVerticalXXS,
-    },
-    headerTitle: {
-        display: 'flex',
-        alignItems: 'baseline',
-        gap: tokens.spacingHorizontalM,
-    },
-    subtitle: {
-        color: tokens.colorNeutralForeground3,
-        fontSize: tokens.fontSizeBase300,
-    },
-    toolbar: {
-        borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
-        padding: tokens.spacingVerticalS,
-    },
-    content: {
-        flex: 1,
-        overflow: 'auto',
-        padding: tokens.spacingVerticalL,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: tokens.spacingVerticalL,
-    },
-    topRowContainer: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: tokens.spacingVerticalL,
-        alignItems: 'stretch',
-    },
-    connectionStatus: {
-        minHeight: '0',
-        height: '100%',
-    },
-    toolboxApi: {
-        minHeight: '0',
-        height: '100%',
-    },
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100vh',
+    backgroundColor: tokens.colorNeutralBackground1,
+    overflow: 'hidden',
+  },
+  content: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  centerMessage: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+    color: tokens.colorNeutralForeground3,
+  },
 });
 
-function App() {
-    const { connection, isLoading, refreshConnection } = useConnection();
-    const { logs, addLog, clearLogs } = useEventLog();
-    const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
-    const styles = useStyles();
+function AppContent() {
+  const styles = useStyles();
+  const ctx = useAppContext();
+  const [rows, setRows] = useState<GridRow[]>([]);
+  const [changes, setChanges] = useState<Map<string, CellChange>>(new Map());
+  const [isBusy, setIsBusy] = useState(false);
 
-    // Handle platform events
-    const handleEvent = useCallback(
-        (event: string, _data: any) => {
-            switch (event) {
-                case 'connection:updated':
-                case 'connection:created':
-                    refreshConnection();
-                    break;
+  const buildHandlerContext = useCallback((): HandlerContext => ({
+    selectedType: ctx.selectedType,
+    entityLogicalName: ctx.selectedEntity,
+    selectedComponent: ctx.selectedComponent,
+    installedLanguages: ctx.installedLanguages.map(l => l.localeid),
+    baseLanguage: ctx.baseLanguage,
+    userLanguage: ctx.userLanguage,
+    solutionName: ctx.selectedSolution || undefined,
+  }), [
+    ctx.baseLanguage,
+    ctx.installedLanguages,
+    ctx.selectedComponent,
+    ctx.selectedEntity,
+    ctx.selectedSolution,
+    ctx.selectedType,
+    ctx.userLanguage,
+  ]);
 
-                case 'connection:deleted':
-                    refreshConnection();
-                    break;
+  // Unsaved changes warning
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (changes.size > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [changes.size]);
 
-                case 'terminal:output':
-                case 'terminal:command:completed':
-                case 'terminal:error':
-                    // Terminal events handled by dedicated components
-                    break;
-            }
-        },
-        [refreshConnection]
-    );
+  const handleLoad = useCallback(async () => {
+    const handler = getHandler(ctx.selectedType);
+    if (!handler) {
+      await window.toolboxAPI.utils.showNotification({
+        title: 'Not Implemented',
+        body: `Type ${ctx.selectedType} is not implemented yet.`,
+        type: 'warning',
+        duration: 3000,
+      });
+      return;
+    }
 
-    useToolboxEvents(handleEvent);
+    setIsBusy(true);
+    setRows([]);
+    setChanges(new Map());
 
-    // Add initial log (run only once on mount)
-    useEffect(() => {
-        addLog('React Sample Tool initialized', 'success');
-    }, [addLog]);
+    try {
+      const result = await handler.load(buildHandlerContext());
+      setRows(result.rows);
 
-    // Get theme from Toolbox API
-    useEffect(() => {
-        const getTheme = async () => {
-            try {
-                const currentTheme = await window.toolboxAPI.utils.getCurrentTheme();
-                setTheme(currentTheme === 'dark' ? 'dark' : 'light');
-            } catch (error) {
-                console.error('Error getting theme:', error);
-            }
-        };
-        getTheme();
-    }, []);
+      await window.toolboxAPI.utils.showNotification({
+        title: 'Load complete',
+        body: `Loaded ${result.rows.length} row(s).`,
+        type: 'success',
+        duration: 2500,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Load failed:', error);
+      await window.toolboxAPI.utils.showNotification({
+        title: 'Load failed',
+        body: message,
+        type: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setIsBusy(false);
+    }
+  }, [buildHandlerContext, ctx.selectedType]);
 
-    const showNotification = useCallback(
-        async (title: string, body: string, type: 'success' | 'info' | 'warning' | 'error') => {
-            try {
-                await window.toolboxAPI.utils.showNotification({
-                    title,
-                    body,
-                    type,
-                    duration: 3000,
-                });
-                addLog(`Notification shown: ${title} - ${body}`, type);
-            } catch (error) {
-                addLog(`Error showing notification: ${(error as Error).message}`, 'error');
-            }
-        },
-        [addLog]
-    );
+  const handleSave = useCallback(async () => {
+    const handler = getHandler(ctx.selectedType);
+    if (!handler) {
+      await window.toolboxAPI.utils.showNotification({
+        title: 'Not Implemented',
+        body: `Type ${ctx.selectedType} is not implemented yet.`,
+        type: 'warning',
+        duration: 3000,
+      });
+      return;
+    }
 
+    if (changes.size === 0) {
+      return;
+    }
+
+    setIsBusy(true);
+
+    try {
+      const changeList = Array.from(changes.values());
+      await handler.save(rows, changeList, buildHandlerContext());
+
+      const reloaded = await handler.load(buildHandlerContext());
+      setRows(reloaded.rows);
+      setChanges(new Map());
+
+      await window.toolboxAPI.utils.showNotification({
+        title: 'Save complete',
+        body: `Saved ${changeList.length} change(s) and published.`,
+        type: 'success',
+        duration: 3000,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Save failed:', error);
+      await window.toolboxAPI.utils.showNotification({
+        title: 'Save failed',
+        body: message,
+        type: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setIsBusy(false);
+    }
+  }, [buildHandlerContext, changes, ctx.selectedType, rows]);
+
+  const handleAutoTranslate = useCallback(() => {
+    // TODO: Step 18
+  }, []);
+
+  const handleFindReplace = useCallback(() => {
+    // TODO: Step 18
+  }, []);
+
+  const handleCellChange = useCallback((change: CellChange) => {
+    setChanges(prev => {
+      const next = new Map(prev);
+      const key = `${change.rowId}|${change.lcid}`;
+      if (change.newValue === change.oldValue) {
+        next.delete(key);
+      } else {
+        next.set(key, change);
+      }
+      return next;
+    });
+  }, []);
+
+  // Initialization state
+  if (ctx.initError) {
     return (
-        <FluentProvider theme={theme === 'dark' ? webDarkTheme : webLightTheme} className={styles.root}>
-            <div className={styles.header}>
-                <div className={styles.headerTitle}>
-                    <Title3>⚛️ React Sample Tool</Title3>
-                    <Text className={styles.subtitle}>A complete example of building Power Platform Tool Box tools with React & TypeScript</Text>
-                </div>
-            </div>
-
-            <Toolbar className={styles.toolbar}>
-                <ToolbarButton icon={<CheckmarkCircle24Regular />} onClick={() => showNotification('Success!', 'Operation completed successfully', 'success')}>
-                    Success
-                </ToolbarButton>
-                <ToolbarButton icon={<Info24Regular />} onClick={() => showNotification('Information', 'This is an informational message', 'info')}>
-                    Info
-                </ToolbarButton>
-                <ToolbarButton icon={<Warning24Regular />} onClick={() => showNotification('Warning', 'Please review this warning', 'warning')}>
-                    Warning
-                </ToolbarButton>
-                <ToolbarButton icon={<DismissCircle24Regular />} onClick={() => showNotification('Error', 'An error has occurred', 'error')}>
-                    Error
-                </ToolbarButton>
-            </Toolbar>
-
-            <div className={styles.content}>
-                <div className={styles.topRowContainer}>
-                    <div className={styles.connectionStatus}>
-                        <ConnectionStatus connection={connection} isLoading={isLoading} />
-                    </div>
-
-                    <div className={styles.toolboxApi}>
-                        <ToolboxAPIDemo onLog={addLog} />
-                    </div>
-                </div>
-
-                <div>
-                    <DataverseAPIDemo connection={connection} onLog={addLog} />
-                </div>
-
-                <div>
-                    <EventLog logs={logs} onClear={clearLogs} />
-                </div>
-            </div>
-        </FluentProvider>
+      <div className={styles.centerMessage}>
+        <Text size={400} weight="semibold">Initialization Error</Text>
+        <Text>{ctx.initError}</Text>
+      </div>
     );
+  }
+
+  if (!ctx.isInitialized) {
+    return (
+      <div className={styles.centerMessage}>
+        <Spinner size="large" />
+        <Text>Connecting to Dataverse...</Text>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.content}>
+      <TranslatorToolbar
+        onLoad={handleLoad}
+        onSave={handleSave}
+        onAutoTranslate={handleAutoTranslate}
+        onFindReplace={handleFindReplace}
+        hasData={rows.length > 0}
+        hasChanges={changes.size > 0}
+        isBusy={isBusy || ctx.isLoading}
+      />
+      {rows.length > 0 ? (
+        <TranslationGrid
+          rows={rows}
+          installedLanguages={ctx.installedLanguages}
+          baseLanguage={ctx.baseLanguage}
+          userLanguage={ctx.userLanguage}
+          onCellChange={handleCellChange}
+          loading={isBusy}
+        />
+      ) : (
+        <div className={styles.centerMessage}>
+          <Text size={400}>Select an entity and type, then click Load</Text>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const styles = useStyles();
+
+  useEffect(() => {
+    const getTheme = async () => {
+      try {
+        const currentTheme = await window.toolboxAPI.utils.getCurrentTheme();
+        setTheme(currentTheme === 'dark' ? 'dark' : 'light');
+      } catch {
+        // Default to light
+      }
+    };
+    getTheme();
+  }, []);
+
+  return (
+    <FluentProvider theme={theme === 'dark' ? webDarkTheme : webLightTheme} className={styles.root}>
+      <ErrorBoundary>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </ErrorBoundary>
+    </FluentProvider>
+  );
 }
 
 export default App;

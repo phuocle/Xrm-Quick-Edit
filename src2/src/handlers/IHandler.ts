@@ -1,4 +1,4 @@
-import type { GridRow, CellChange, LoadResult } from '@/types/grid';
+import type { GridRow, CellChange, LoadResult, MetadataComponent, TranslationType } from '@/types/grid';
 
 /**
  * Moi handler implement interface nay.
@@ -37,9 +37,12 @@ export interface ComponentOption {
 
 /** Context passed to handlers — subset of AppContext relevant to data operations */
 export interface HandlerContext {
+  selectedType: TranslationType;
   entityLogicalName: string;
+  selectedComponent: MetadataComponent;
   installedLanguages: number[];
   baseLanguage: number;
-  solutionId?: string;
+  userLanguage: number;
+  solutionName?: string;
   selectedComponentId?: string;
 }

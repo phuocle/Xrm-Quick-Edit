@@ -22,6 +22,8 @@ export interface AttributeMetadata {
   Description: Label;
   AttributeType: string;
   AttributeTypeName: { Value: string };
+  IsCustomizable?: { Value: boolean };
+  IsRenameable?: { Value: boolean };
   FormulaDefinition?: string | null;  // Rollup fields co formula
   OptionSet?: OptionSetMetadata | null;
 }
@@ -99,6 +101,7 @@ export interface SavedQuery {
   name: string;
   querytype: number;
   returnedtypecode: string;
+  iscustomizable?: { Value: boolean };
 }
 
 /** Chart record */
@@ -106,6 +109,7 @@ export interface SavedQueryVisualization {
   savedqueryvisualizationid: string;
   name: string;
   primaryentitytypecode: string;
+  iscustomizable?: { Value: boolean };
 }
 
 /** Installed language info */
