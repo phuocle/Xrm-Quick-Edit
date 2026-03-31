@@ -6,6 +6,7 @@ import { entityHandler } from '@/handlers/entityHandler';
 import { formMetaHandler } from '@/handlers/formMetaHandler';
 import { globalOptionSetHandler } from '@/handlers/globalOptionSetHandler';
 import { optionSetHandler } from '@/handlers/optionSetHandler';
+import { relationshipHandler } from '@/handlers/relationshipHandler';
 import { viewHandler } from '@/handlers/viewHandler';
 
 export function getHandler(type: TranslationType): IHandler | null {
@@ -24,6 +25,8 @@ export function getHandler(type: TranslationType): IHandler | null {
       return entityHandler;
     case 'formMeta':
       return formMetaHandler;
+    case 'relationships':
+      return relationshipHandler;
     default:
       return null;
   }

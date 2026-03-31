@@ -74,31 +74,40 @@ export interface EntityMetadata {
 }
 
 /** Relationship metadata (OneToMany) */
+export interface RelationshipMenuConfiguration {
+  Label?: Label;
+  Behavior?: string;
+  IsCustomizable?: boolean;
+}
+
 export interface OneToManyRelationshipMetadata {
   MetadataId: string;
   SchemaName: string;
+  IsCustomizable?: { Value: boolean };
   ReferencedEntity: string;
   ReferencingEntity: string;
-  AssociatedMenuConfiguration: {
-    Label: Label;
-    Behavior: string;
-  };
+  AssociatedMenuConfiguration?: RelationshipMenuConfiguration;
+}
+
+/** Relationship metadata (ManyToOne) */
+export interface ManyToOneRelationshipMetadata {
+  MetadataId: string;
+  SchemaName: string;
+  IsCustomizable?: { Value: boolean };
+  ReferencedEntity: string;
+  ReferencingEntity: string;
+  AssociatedMenuConfiguration?: RelationshipMenuConfiguration;
 }
 
 /** Relationship metadata (ManyToMany) */
 export interface ManyToManyRelationshipMetadata {
   MetadataId: string;
   SchemaName: string;
+  IsCustomizable?: { Value: boolean };
   Entity1LogicalName: string;
   Entity2LogicalName: string;
-  Entity1AssociatedMenuConfiguration: {
-    Label: Label;
-    Behavior: string;
-  };
-  Entity2AssociatedMenuConfiguration: {
-    Label: Label;
-    Behavior: string;
-  };
+  Entity1AssociatedMenuConfiguration?: RelationshipMenuConfiguration;
+  Entity2AssociatedMenuConfiguration?: RelationshipMenuConfiguration;
 }
 
 /** Form record (tu FetchXml query systemform) */

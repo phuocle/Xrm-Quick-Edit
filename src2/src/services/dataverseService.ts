@@ -3,6 +3,7 @@
 import type {
   AttributeMetadata,
   EntityMetadata,
+  ManyToOneRelationshipMetadata,
   OneToManyRelationshipMetadata,
   ManyToManyRelationshipMetadata,
   OptionSetMetadata,
@@ -176,24 +177,63 @@ export const dataverseService = {
 
   async getRelationships(entityLogicalName: string): Promise<{
     oneToMany: OneToManyRelationshipMetadata[];
+    manyToOne: ManyToOneRelationshipMetadata[];
     manyToMany: ManyToManyRelationshipMetadata[];
   }> {
-    const [oneToManyResult, manyToManyResult] = await Promise.all([
+    const [oneToManyResult, manyToOneResult, manyToManyResult] = await Promise.all([
       window.dataverseAPI.getEntityRelatedMetadata(
         entityLogicalName,
         'OneToManyRelationships',
-        ['MetadataId', 'SchemaName', 'ReferencedEntity', 'ReferencingEntity', 'AssociatedMenuConfiguration']
+        ['MetadataId', 'SchemaName', 'IsCustomizable', 'ReferencedEntity', 'ReferencingEntity', 'AssociatedMenuConfiguration']
+      ),
+      window.dataverseAPI.getEntityRelatedMetadata(
+        entityLogicalName,
+        'ManyToOneRelationships',
+        ['MetadataId', 'SchemaName', 'IsCustomizable', 'ReferencedEntity', 'ReferencingEntity', 'AssociatedMenuConfiguration']
       ),
       window.dataverseAPI.getEntityRelatedMetadata(
         entityLogicalName,
         'ManyToManyRelationships',
-        ['MetadataId', 'SchemaName', 'Entity1LogicalName', 'Entity2LogicalName', 'Entity1AssociatedMenuConfiguration', 'Entity2AssociatedMenuConfiguration']
+        ['MetadataId', 'SchemaName', 'IsCustomizable', 'Entity1LogicalName', 'Entity2LogicalName', 'Entity1AssociatedMenuConfiguration', 'Entity2AssociatedMenuConfiguration']
       ),
     ]);
     return {
       oneToMany: oneToManyResult.value as unknown as OneToManyRelationshipMetadata[],
+      manyToOne: manyToOneResult.value as unknown as ManyToOneRelationshipMetadata[],
       manyToMany: manyToManyResult.value as unknown as ManyToManyRelationshipMetadata[],
     };
+  },
+
+  async getEntityPluralNames(entityLogicalNames: string[]): Promise<Record<string, Record<number, string>>> {
+    if (entityLogicalNames.length === 0) {
+      return {};
+    }
+
+    const escapedNames = Array.from(new Set(entityLogicalNames.map(name => name.toLowerCase())))
+      .map(name => escapeODataLiteral(name));
+    const filter = escapedNames.map(name => `LogicalName eq '${name}'`).join(' or ');
+
+    const result = await window.dataverseAPI.queryData(
+      `EntityDefinitions?$select=LogicalName,DisplayCollectionName&$filter=${filter}`
+    );
+
+    const map: Record<string, Record<number, string>> = {};
+    const entities = result.value as unknown as Array<{
+      LogicalName: string;
+      DisplayCollectionName?: Label;
+    }>;
+
+    for (const entity of entities ?? []) {
+      const labels = entity.DisplayCollectionName?.LocalizedLabels ?? [];
+      const localizedMap: Record<number, string> = {};
+      for (const label of labels) {
+        localizedMap[label.LanguageCode] = label.Label;
+      }
+
+      map[entity.LogicalName?.toLowerCase()] = localizedMap;
+    }
+
+    return map;
   },
 
   // ---- FetchXml queries ----
