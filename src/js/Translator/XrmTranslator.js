@@ -31,7 +31,7 @@
     XrmTranslator.entity = null;
     XrmTranslator.type = null;
 
-    XrmTranslator.lockAcquired = null;
+
 
     // We need those for the FormHandleer, uilanguageid is current user language, formXml only contains labels for this locale by default
     XrmTranslator.userId = null;
@@ -1049,156 +1049,6 @@
         }
     }
 
-    function IsLockedForUser(entity) {
-        return WebApiClient.Retrieve({
-            entityName: "oss_translationlock",
-            queryParams: "?$select=_ownerid_value&$filter=oss_name eq '" + entity + "'",
-            headers: [
-                { key: "Prefer", value: 'odata.include-annotations="*"' }
-            ]
-        })
-        .then(function (response){
-            if (response.value.length) {
-                return (response.value[0]._ownerid_value.toLowerCase() === Xrm.Page.context.getUserId().replace("{", "").replace("}", "").toLowerCase());
-            }
-            return false;
-        });
-    }
-
-    function DisableColumns() {
-        XrmTranslator.GetGrid().toolbar.set("lockOrUnlock", { img: XrmTranslator.lockAcquired ? 'w2ui-icon-pencil' : 'w2ui-icon-cross' });
-
-        w2ui['grid_toolbar'].disable("aiTranslate");
-        w2ui['grid_toolbar'].disable("findReplace");
-        w2ui['grid_toolbar'].disable("filterUntranslated");
-
-        XrmTranslator.GetGrid().columns.forEach(function(c) {
-            if (c["editable"]) {
-                c["editableBackup"] = c["editable"]; delete c["editable"];
-            }
-        });
-        XrmTranslator.GetGrid().refresh();
-    }
-
-    function EnableColumns() {
-        XrmTranslator.GetGrid().toolbar.set("lockOrUnlock", { img: XrmTranslator.lockAcquired ? 'w2ui-icon-pencil' : 'w2ui-icon-cross' });
-
-        w2ui['grid_toolbar'].enable("aiTranslate");
-        w2ui['grid_toolbar'].enable("findReplace");
-        w2ui['grid_toolbar'].enable("filterUntranslated");
-
-        XrmTranslator.GetGrid().columns.forEach(function(c) {
-            if (c["editableBackup"]) {
-                c["editable"] = c["editableBackup"]; delete c["editableBackup"];
-            }
-        });
-        XrmTranslator.GetGrid().refresh();
-    }
-
-    function AcquireLock() {
-        XrmTranslator.LockGrid("Acquiring lock for entity " + XrmTranslator.GetEntity().toLowerCase());
-
-        const entity = XrmTranslator.GetEntity().toLowerCase();
-
-        if (!entity) {
-            return Promise.resolve(null);
-        }
-
-        return WebApiClient.Create({
-            entityName: "oss_translationlock",
-            entity: {
-                oss_name: entity,
-                oss_language: "any"
-            }
-        })
-        .then(function() {
-            XrmTranslator.lockAcquired = true;
-            EnableColumns();
-            XrmTranslator.UnlockGrid();
-        })
-        .catch(function(e) {
-            XrmTranslator.UnlockGrid();
-
-            return WebApiClient.Retrieve({
-                entityName: "oss_translationlock",
-                queryParams: "?$select=_ownerid_value&$filter=oss_name eq '" + entity + "'",
-                headers: [
-                    { key: "Prefer", value: 'odata.include-annotations="*"' }
-                ]
-            })
-            .then(function (response){
-                if (response.value.length) {
-                    if (response.value[0]._ownerid_value.toLowerCase() === Xrm.Page.context.getUserId().replace("{", "").replace("}", "").toLowerCase()) {
-                        XrmTranslator.lockAcquired = true;
-                        EnableColumns();
-                        return null;
-                    }
-                    else {
-                        alert("Failed to acquire lock, it is currently locked by " +  response.value[0]["_ownerid_value@OData.Community.Display.V1.FormattedValue"] + ". Opening in readonly mode.");
-                    }
-                }
-                else {
-                    alert("Failed to acquire lock, error: " + (e.message || e));
-                }
-
-                DisableColumns();
-                return null;
-            });
-        });
-    }
-
-    function ReleaseLock(entity) {
-        if (!entity) {
-            return Promise.resolve(null);
-        }
-
-        const userId = Xrm.Page.context.getUserId().replace("{", "").replace("}", "");
-
-        return WebApiClient.Retrieve({
-            entityName: "oss_translationlock",
-            queryParams: "?$select=oss_translationlockid&$filter=oss_name eq '" + entity + "' and _ownerid_value eq " + userId,
-        })
-        .then(function(response) {
-            const lock = response.value.length ? response.value[0] : null;
-
-            if (!lock) {
-                return null;
-            }
-
-            return WebApiClient.Delete({
-                entityName: "oss_translationlock",
-                entityId: lock.oss_translationlockid
-            });
-        })
-        .then(function(){
-            XrmTranslator.lockAcquired = false;
-            XrmTranslator.GetGrid().refresh();
-        })
-        .then(DisableColumns);
-    }
-
-    XrmTranslator.ReleaseLockAndPrompt = function(entity) {
-        if (!XrmTranslator.config.enableLocking || !XrmTranslator.config.autoRelease) {
-            return Promise.resolve(null);
-        }
-
-        return ReleaseLock(entity || XrmTranslator.GetEntity())
-        .then(function() {
-            return new Promise(function(resolve, reject) {
-                w2confirm("Saving is done and your lock was released.\nDo you want to reacquire your lock to continue editing?", function (answer) {
-                    resolve(answer === "Yes");
-                });
-            });
-        })
-        .then(function(reacquireLock) {
-            if (reacquireLock) {
-                return AcquireLock();
-            }
-
-            return null;
-        });
-    };
-
     function LoadHandler () {
         var entity = XrmTranslator.GetEntity();
 
@@ -1206,12 +1056,7 @@
             return;
         }
 
-        if (XrmTranslator.lockAcquired && entity === XrmTranslator.entity) {
-            LockAndLoad(entity, true);
-        }
-        else {
-            LockAndLoad(entity);
-        }
+        TriggerLoading(entity);
     }
 
     function ShowAbout () {
@@ -1302,30 +1147,6 @@
                 };
             }
         });
-    }
-
-    function LockAndLoad (entity, lock) {
-        if (XrmTranslator.config.enableLocking && entity) {
-            IsLockedForUser(entity)
-            .then(function(alreadyLockedByUser) {
-                if(alreadyLockedByUser || lock || confirm("Do you want to lock this entity for translating? If you do not, it will be readonly.")) {
-                    AcquireLock()
-                    .then(function() {
-                        TriggerLoading(entity);
-                    });
-                }
-                else {
-                    XrmTranslator.lockAcquired = false;
-                    // Refresh when moving from locked to unlocked entity and not choosing to lock
-                    w2ui.grid_toolbar.refresh();
-                    DisableColumns();
-                    TriggerLoading(entity);
-                }
-            });
-        }
-        else {
-            TriggerLoading(entity);
-        }
     }
 
     function TriggerLoading(entity) {
@@ -1572,18 +1393,6 @@
             ToggleUntranslatedFilter();
         } });
 
-        if (XrmTranslator.config.enableLocking) {
-            items.push({ type: 'menu-radio', id: 'lockOrUnlock', img: 'w2ui-icon-cross',
-                text: function (name, item) {
-                    return XrmTranslator.lockAcquired ? "Locked" : "Not Locked";
-                },
-                items: [
-                    { type: 'button', id: 'lock', text: 'Lock Entity', img:'w2ui-icon-pencil' },
-                    { type: 'button', id: 'unlock', text: 'Unlock Entity', img:'w2ui-icon-cross' }
-                ]
-            });
-        }
-
         items.push({ type: 'spacer' });
 
         if (XrmTranslator.showDebugButton) {
@@ -1627,12 +1436,6 @@
                             break;
                         case "aiTranslate:aiSettings":
                             TranslationHandler.ShowAISettings();
-                            break;
-                        case "lockOrUnlock:lock":
-                            LockAndLoad(XrmTranslator.GetEntity(), true);
-                            break;
-                        case "lockOrUnlock:unlock":
-                            ReleaseLock(XrmTranslator.GetEntity())
                             break;
                     }
                 }

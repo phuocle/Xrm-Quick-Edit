@@ -6,3 +6,6 @@ Publish/*
 .codex/config.toml
 TestConsole/
 *.sln
+solutions/1.before/
+solutions/2.unpack/
+solutions/3.after/
