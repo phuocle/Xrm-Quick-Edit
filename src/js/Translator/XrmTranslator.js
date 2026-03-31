@@ -842,6 +842,23 @@
         });
     }
 
+    var typesWithDescription = ["attributes", "options", "entityMeta", "globalOptionSets", "sitemap"];
+
+    function UpdateComponentDropdown(selectedType) {
+        var hasDescription = typesWithDescription.indexOf(selectedType) !== -1;
+        var componentItem = w2ui.filterbar.get("component");
+
+        if (hasDescription) {
+            w2ui['filterbar'].enable("component");
+        } else {
+            if (componentItem) {
+                componentItem.selected = "DisplayName";
+            }
+            w2ui['filterbar'].disable("component");
+        }
+        w2ui.filterbar.refresh();
+    }
+
     function InitializeFindAndReplaceDialog() {
         var languageItems = [];
         var availableLanguages = XrmTranslator.GetGrid().columns;
@@ -1215,7 +1232,7 @@
             title: 'About',
             body: html,
             width: 500,
-            height: 320,
+            height: 400,
             modal: true,
             showClose: true,
             buttons: '<button class="w2ui-btn" onclick="w2popup.close();">Close</button>'
@@ -1442,6 +1459,11 @@
                     RepopulateEntitySelector(selectedSolutionId);
                 }
 
+                if (target.startsWith("type:")) {
+                    var selectedType = target.replace("type:", "");
+                    UpdateComponentDropdown(selectedType);
+                }
+
                 if (target.startsWith("entitySelect:")) {
                     if (target === "entitySelect:none") {
                         w2ui['filterbar'].hide('type:allInOne');
@@ -1464,6 +1486,7 @@
 
                         if (["allInOne", "attributes", "options", "forms", "views", "formMeta", "entityMeta", "relationships", "charts", "bpf", "content"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
                             w2ui.filterbar.get("type").selected = "sitemap";
+                            UpdateComponentDropdown("sitemap");
                             w2ui.filterbar.refresh();
                         }
                     }
@@ -1492,6 +1515,7 @@
 
                         if (["content", "webresources", "dashboards", "sitemap", "globalOptionSets"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
                             w2ui.filterbar.get("type").selected = "attributes";
+                            UpdateComponentDropdown("attributes");
                             w2ui.filterbar.refresh();
                         }
                     }
