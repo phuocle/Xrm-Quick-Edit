@@ -462,18 +462,18 @@
 
     function ShowTranslationResults (results) {
         if (!w2ui.translationResultGrid) {
-            var grid = {
+            new w2grid({
                 name: 'translationResultGrid',
                 show: { selectColumn: true },
                 multiSelect: true,
                 columns: [
-                    { field: 'schemaName', caption: 'Schema Name', size: '25%', sortable: true, searchable: true },
-                    { field: 'column', caption: 'Column LCID', sortable: true, searchable: true, hidden: true },
-                    { field: 'source', caption: 'Source Text', size: '25%', sortable: true, searchable: true },
-                    { field: 'translation', caption: 'Translated Text', size: '25%', sortable: true, searchable: true, editable: { type: 'text' } },
+                    { field: 'schemaName', text: 'Schema Name', size: '25%', sortable: true, searchable: true },
+                    { field: 'column', text: 'Column LCID', sortable: true, searchable: true, hidden: true },
+                    { field: 'source', text: 'Source Text', size: '25%', sortable: true, searchable: true },
+                    { field: 'translation', text: 'Translated Text', size: '25%', sortable: true, searchable: true, editable: { type: 'text' } },
                     {
                         field: 'fromDictionary',
-                        caption: 'From Dictionary',
+                        text: 'From Dictionary',
                         size: '12%',
                         sortable: true,
                         searchable: true,
@@ -483,11 +483,6 @@
                     }
                 ],
                 records: []
-            };
-
-            $(function () {
-                // initialization in memory
-                $().w2grid(grid);
             });
         }
 
@@ -504,14 +499,14 @@
             body    : '<div id="main" style="position: absolute; left: 5px; top: 5px; right: 5px; bottom: 5px;"></div>',
             onOpen  : function (event) {
                 event.onComplete = function () {
-                    $('#w2ui-popup #main').w2render('translationResultGrid');
+                    w2ui.translationResultGrid.render('#w2ui-popup #main');
                     w2ui.translationResultGrid.selectAll();
                 };
             },
             onToggle: function (event) {
-                $(w2ui.translationResultGrid.box).hide();
+                w2ui.translationResultGrid.box.style.display = 'none';
                 event.onComplete = function () {
-                    $(w2ui.translationResultGrid.box).show();
+                    w2ui.translationResultGrid.box.style.display = '';
                     w2ui.translationResultGrid.resize();
                 }
             }
@@ -734,7 +729,7 @@
 
         if (!w2ui.translationPrompt)
         {
-            $().w2form({
+            new w2form({
                 name: 'translationPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
@@ -835,7 +830,7 @@
     TranslationHandler.ShowTranslationPrompt = function() {
         InitializeTranslationPrompt()
         .then(function() {
-            $().w2popup('open', {
+            w2popup.open({
                 title   : 'Choose tranlations source and destination',
                 name    : 'translationPopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
@@ -844,16 +839,16 @@
                 height  : 360,
                 showMax : true,
                 onToggle: function (event) {
-                    $(w2ui.translationPrompt.box).hide();
+                    w2ui.translationPrompt.box.style.display = 'none';
                     event.onComplete = function () {
-                        $(w2ui.translationPrompt.box).show();
+                        w2ui.translationPrompt.box.style.display = '';
                         w2ui.translationPrompt.resize();
                     }
                 },
                 onOpen: function (event) {
                     event.onComplete = function () {
                         // specifying an onOpen handler instead is equivalent to specifying an onBeforeOpen handler, which would make this code execute too early and hence not deliver.
-                        $('#w2ui-popup #form').w2render('translationPrompt');
+                        w2ui.translationPrompt.render('#w2ui-popup #form');
                     }
                 }
             });
@@ -872,12 +867,12 @@
         var maskedOpenaiKey = MaskApiKey(openaiConfig.apiKey);
 
         if (!w2ui.aiSettings) {
-            $().w2form({
+            new w2form({
                 name: 'aiSettings',
                 style: 'border: 0px; background-color: transparent;',
                 tabs: [
-                    { id: 'tab-google', caption: 'Google' },
-                    { id: 'tab-openai', caption: 'OpenAI' }
+                    { id: 'tab-google', text: 'Google' },
+                    { id: 'tab-openai', text: 'OpenAI' }
                 ],
                 formHTML:
                     '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
@@ -979,7 +974,7 @@
     TranslationHandler.ShowAISettings = function() {
         InitializeAISettingsForm()
         .then(function() {
-            $().w2popup('open', {
+            w2popup.open({
                 title   : 'AI Translation Settings',
                 name    : 'aiSettingsPopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
@@ -988,15 +983,15 @@
                 height  : 420,
                 showMax : true,
                 onToggle: function (event) {
-                    $(w2ui.aiSettings.box).hide();
+                    w2ui.aiSettings.box.style.display = 'none';
                     event.onComplete = function () {
-                        $(w2ui.aiSettings.box).show();
+                        w2ui.aiSettings.box.style.display = '';
                         w2ui.aiSettings.resize();
                     }
                 },
                 onOpen: function (event) {
                     event.onComplete = function () {
-                        $('#w2ui-popup #form').w2render('aiSettings');
+                        w2ui.aiSettings.render('#w2ui-popup #form');
                     }
                 }
             });
@@ -1011,7 +1006,7 @@
         ];
 
         if (!w2ui.applyDictionaryPrompt) {
-            $().w2form({
+            new w2form({
                 name: 'applyDictionaryPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
@@ -1049,7 +1044,7 @@
             w2ui.applyDictionaryPrompt.refresh();
         }
 
-        $().w2popup('open', {
+        w2popup.open({
             title   : 'Apply Dictionary',
             name    : 'applyDictionaryPopup',
             body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
@@ -1058,15 +1053,15 @@
             height  : 220,
             showMax : false,
             onToggle: function (event) {
-                $(w2ui.applyDictionaryPrompt.box).hide();
+                w2ui.applyDictionaryPrompt.box.style.display = 'none';
                 event.onComplete = function () {
-                    $(w2ui.applyDictionaryPrompt.box).show();
+                    w2ui.applyDictionaryPrompt.box.style.display = '';
                     w2ui.applyDictionaryPrompt.resize();
                 }
             },
             onOpen: function (event) {
                 event.onComplete = function () {
-                    $('#w2ui-popup #form').w2render('applyDictionaryPrompt');
+                    w2ui.applyDictionaryPrompt.render('#w2ui-popup #form');
                 }
             }
         });
@@ -1201,8 +1196,8 @@
 
                 var editable = config.lockedLanguages && config.lockedLanguages.indexOf(language) !== -1 ? null : { type: 'text' };
 
-                grid.addColumn({ field: language, caption: `${locale.language || language} (${locale.code})`, size: columnWidth + "%", sortable: true, editable: editable });
-                grid.addSearch({ field: language, caption: `${locale.language || language} (${locale.code})`, type: 'text' });
+                grid.addColumn({ field: language, text: `${locale.language || language} (${locale.code})`, size: columnWidth + "%", sortable: true, editable: editable });
+                grid.addSearch({ field: language, text: `${locale.language || language} (${locale.code})`, type: 'text' });
 
                 if (config.hideLanguagesByDefault && language !== userSettings.uilanguageid) {
                     grid.hideColumn(language);
@@ -1230,8 +1225,8 @@
 
             var editable = { type: 'text' };
 
-            grid.addColumn({ field: languages[locale], caption: locale, size: columnWidth + "%", sortable: true, editable: editable });
-            grid.addSearch({ field: languages[locale], caption: locale, type: 'text' });
+            grid.addColumn({ field: languages[locale], text: locale, size: columnWidth + "%", sortable: true, editable: editable });
+            grid.addSearch({ field: languages[locale], text: locale, type: 'text' });
         }
 
         return languages;

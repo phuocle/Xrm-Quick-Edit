@@ -34,7 +34,7 @@
     var currentHandler = null;
     var solutionEntityCache = {};
     var initialColumns = [
-        { field: 'schemaName', caption: 'Schema Name', size: '20%', sortable: true, resizable: true, frozen: true }
+        { field: 'schemaName', text: 'Schema Name', size: '20%', sortable: true, resizable: true, frozen: true }
     ];
 
     XrmPropertyEditor.RestoreInitialColumns = function () {
@@ -163,8 +163,9 @@
     }
 
     function InitializeGrid (entities) {
-        $('#grid').w2grid({
+        new w2grid({
             name: 'grid',
+            box: '#grid',
             show: {
                 toolbar: true,
                 footer: true,
@@ -173,7 +174,7 @@
             },
             multiSearch: true,
             searches: [
-                { field: 'schemaName', caption: 'Schema Name', type: 'text' }
+                { field: 'schemaName', text: 'Schema Name', type: 'text' }
             ],
             columns: initialColumns,
             onSave: function (event) {
@@ -181,7 +182,7 @@
             },
             toolbar: {
                 items: [
-                    { type: 'menu-radio', id: 'solutionSelect', img: 'icon-folder',
+                    { type: 'menu-radio', id: 'solutionSelect', icon: 'icon-folder',
                         text: function (item) {
                             var el = this.get('solutionSelect:' + item.selected);
                             if (el) {
@@ -195,7 +196,7 @@
                             { text: '--' }
                         ]
                     },
-                    { type: 'menu-radio', id: 'entitySelect', img: 'icon-folder',
+                    { type: 'menu-radio', id: 'entitySelect', icon: 'icon-folder',
                         text: function (item) {
                             var text = item.selected;
                             var el = this.get('entitySelect:' + item.selected);
@@ -209,7 +210,7 @@
                         },
                         items: []
                     },
-                    { type: 'menu-radio', id: 'type', img: 'icon-folder',
+                    { type: 'menu-radio', id: 'type', icon: 'icon-folder',
                         text: function (item) {
                             var text = item.selected;
                             var el   = this.get('type:' + item.selected);
@@ -221,7 +222,7 @@
                             //{ id: 'entities', text: 'Entities', icon: 'fa-picture' }
                         ]
                     },
-                    { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: function (event) {
+                    { type: 'button', id: 'load', text: 'Load', icon:'w2ui-icon-reload', onClick: function (event) {
                         var entity = XrmPropertyEditor.GetEntity();
 
                         if (!entity || !XrmPropertyEditor.GetType()) {
@@ -244,7 +245,7 @@
                     }
                 }
             }
-        });
+        }).render();
 
         XrmPropertyEditor.LockGrid("Loading entities");
     }

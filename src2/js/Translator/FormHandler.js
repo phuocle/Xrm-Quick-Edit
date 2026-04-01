@@ -348,7 +348,7 @@
         var formsByLanguage = FormHandler.formsByLanguage;
 
         if (!w2ui.formSelectionPrompt) {
-            $().w2form({
+            new w2form({
                 name: 'formSelectionPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
@@ -409,7 +409,7 @@
         w2ui.formSelectionPrompt.record.formSelection = null;
         w2ui.formSelectionPrompt.fields[0].options = { items: formItems };
 
-        $().w2popup('open', {
+        w2popup.open({
             title   : 'Choose Form',
             name    : 'formSelectionPopup',
             body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
@@ -418,16 +418,16 @@
             height  : 250,
             showMax : true,
             onToggle: function (event) {
-                $(w2ui.formSelection.box).hide();
+                w2ui.formSelectionPrompt.box.style.display = 'none';
                 event.onComplete = function () {
-                    $(w2ui.formSelection.box).show();
-                    w2ui.formSelection.resize();
+                    w2ui.formSelectionPrompt.box.style.display = '';
+                    w2ui.formSelectionPrompt.resize();
                 }
             },
             onOpen: function (event) {
                 event.onComplete = function () {
                     // specifying an onOpen handler instead is equivalent to specifying an onBeforeOpen handler, which would make this code execute too early and hence not deliver.
-                    $('#w2ui-popup #form').w2render('formSelectionPrompt');
+                    w2ui.formSelectionPrompt.render('#w2ui-popup #form');
                 }
             },
             onClose: function (event) {

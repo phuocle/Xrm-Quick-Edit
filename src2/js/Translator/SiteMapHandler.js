@@ -271,7 +271,7 @@
 
     function ShowSiteMapSelection(sitemaps) {
         if (!w2ui.siteMapSelectionPrompt) {
-            $().w2form({
+            new w2form({
                 name: 'siteMapSelectionPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
@@ -317,7 +317,7 @@
         w2ui.siteMapSelectionPrompt.record.siteMapSelection = null;
         w2ui.siteMapSelectionPrompt.fields[0].options = { items: items };
 
-        $().w2popup('open', {
+        w2popup.open({
             title: 'Choose SiteMap',
             name: 'siteMapSelectionPopup',
             body: '<div id="form" style="width: 100%; height: 100%;"></div>',
@@ -327,7 +327,7 @@
             showMax: true,
             onOpen: function (event) {
                 event.onComplete = function () {
-                    $('#w2ui-popup #form').w2render('siteMapSelectionPrompt');
+                    w2ui.siteMapSelectionPrompt.render('#w2ui-popup #form');
                 };
             },
             onClose: function () {

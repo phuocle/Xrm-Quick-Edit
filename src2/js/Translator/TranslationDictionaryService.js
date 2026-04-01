@@ -1203,23 +1203,23 @@
         var targetSize = targetCount > 0 ? (100 - sourceSize - activeSize) / targetCount : 0;
 
         var columns = [
-            { field: "sourceText", caption: "Source " + context.baseName, size: sourceSize + "%", sortable: true, editable: { type: "text" } }
+            { field: "sourceText", text: "Source " + context.baseName, size: sourceSize + "%", sortable: true, editable: { type: "text" } }
         ];
 
         for (var i = 0; i < context.targetLanguages.length; i++) {
             var target = context.targetLanguages[i];
             columns.push({
                 field: target.field,
-                caption: "Target " + target.name,
+                text: "Target " + target.name,
                 size: targetSize.toFixed(2) + "%",
                 sortable: true,
                 editable: { type: "text" }
             });
         }
 
-        columns.push({ field: "isActive", caption: "Active", size: activeSize + "%", sortable: true, editable: { type: "checkbox" } });
+        columns.push({ field: "isActive", text: "Active", size: activeSize + "%", sortable: true, editable: { type: "checkbox" } });
 
-        $().w2grid({
+        new w2grid({
             name: "translationDictionaryGrid",
             show: {
                 toolbar: true,
@@ -1371,14 +1371,14 @@
                     body: '<div id="dictionary-main" style="position: absolute; left: 5px; top: 5px; right: 5px; bottom: 5px;"></div>',
                     onOpen: function (event) {
                         event.onComplete = function () {
-                            $("#w2ui-popup #dictionary-main").w2render("translationDictionaryGrid");
+                            w2ui.translationDictionaryGrid.render("#w2ui-popup #dictionary-main");
                             setTimeout(function () { w2popup.max(); }, 100);
                         };
                     },
                     onToggle: function (event) {
-                        $(w2ui.translationDictionaryGrid.box).hide();
+                        w2ui.translationDictionaryGrid.box.style.display = 'none';
                         event.onComplete = function () {
-                            $(w2ui.translationDictionaryGrid.box).show();
+                            w2ui.translationDictionaryGrid.box.style.display = '';
                             w2ui.translationDictionaryGrid.resize();
                         };
                     },

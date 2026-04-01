@@ -103,8 +103,8 @@
         var columnSize = 100 / 5;
 
         grid.columns = [
-            { field: 'schemaName', caption: 'Schema Name', size: columnSize + '%', sortable: true, resizable: true, frozen: true },
-            { field: 'RequiredLevel', caption: 'Required Level', size: columnSize + '%', sortable: true, resizable: true,
+            { field: 'schemaName', text: 'Schema Name', size: columnSize + '%', sortable: true, resizable: true, frozen: true },
+            { field: 'RequiredLevel', text: 'Required Level', size: columnSize + '%', sortable: true, resizable: true,
                 editable: { type: 'select', items: levels, showAll: true },
                   render: function (record, index, col_index) {
                       var html = '';
@@ -117,13 +117,13 @@
                       return html;
                   }
             },
-            { field: 'IsAuditEnabled', caption: 'Is Audit Enabled', size: columnSize + '%', sortable: true, resizable: true, style: 'text-align: center',
+            { field: 'IsAuditEnabled', text: 'Is Audit Enabled', size: columnSize + '%', sortable: true, resizable: true, style: 'text-align: center',
                 editable: { type: 'checkbox', style: 'text-align: center' }
             },
-            { field: 'IsValidForAdvancedFind', caption: 'Is Valid For Advanced Find', size: columnSize + '%', sortable: true, resizable: true, style: 'text-align: center',
+            { field: 'IsValidForAdvancedFind', text: 'Is Valid For Advanced Find', size: columnSize + '%', sortable: true, resizable: true, style: 'text-align: center',
                 editable: { type: 'checkbox', style: 'text-align: center' }
             },
-            { field: 'IsSecured', caption: 'Is Secured', size: columnSize + '%', sortable: true, resizable: true, style: 'text-align: center',
+            { field: 'IsSecured', text: 'Is Secured', size: columnSize + '%', sortable: true, resizable: true, style: 'text-align: center',
                 editable: { type: 'checkbox', style: 'text-align: center' }
             }
         ];

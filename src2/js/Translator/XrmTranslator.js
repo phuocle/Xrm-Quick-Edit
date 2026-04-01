@@ -595,23 +595,18 @@
 
     function ShowFindAndReplaceResults (results) {
         if (!w2ui.findAndReplaceGrid) {
-            var grid = {
+            new w2grid({
                 name: 'findAndReplaceGrid',
                 show: { selectColumn: true },
                 multiSelect: true,
                 columns: [
-                    { field: 'schemaName', caption: 'Schema Name', size: '25%', sortable: true, searchable: true },
-                    { field: 'column', caption: 'Column LCID', sortable: true, searchable: true, hidden: true },
-                    { field: 'columnName', caption: 'Column', size: '25%', sortable: true, searchable: true },
-                    { field: 'current', caption: 'Current Text', size: '25%', sortable: true, searchable: true },
-                    { field: 'replaced', caption: 'Replaced Text', size: '25%', sortable: true, searchable: true, editable: { type: 'text' } }
+                    { field: 'schemaName', text: 'Schema Name', size: '25%', sortable: true, searchable: true },
+                    { field: 'column', text: 'Column LCID', sortable: true, searchable: true, hidden: true },
+                    { field: 'columnName', text: 'Column', size: '25%', sortable: true, searchable: true },
+                    { field: 'current', text: 'Current Text', size: '25%', sortable: true, searchable: true },
+                    { field: 'replaced', text: 'Replaced Text', size: '25%', sortable: true, searchable: true, editable: { type: 'text' } }
                 ],
                 records: []
-            };
-
-            $(function () {
-                // initialization in memory
-                $().w2grid(grid);
             });
         }
 
@@ -628,14 +623,14 @@
             body    : '<div id="main" style="position: absolute; left: 5px; top: 5px; right: 5px; bottom: 5px;"></div>',
             onOpen  : function (event) {
                 event.onComplete = function () {
-                    $('#w2ui-popup #main').w2render('findAndReplaceGrid');
+                    w2ui.findAndReplaceGrid.render('#w2ui-popup #main');
                     w2ui.findAndReplaceGrid.selectAll();
                 };
             },
             onToggle: function (event) {
-                $(w2ui.findAndReplaceGrid.box).hide();
+                w2ui.findAndReplaceGrid.box.style.display = 'none';
                 event.onComplete = function () {
-                    $(w2ui.findAndReplaceGrid.box).show();
+                    w2ui.findAndReplaceGrid.box.style.display = '';
                     w2ui.findAndReplaceGrid.resize();
                 }
             }
@@ -717,13 +712,13 @@
 
     XrmTranslator.ShowRecordSelector = function (callbackName, callbackParameters, preselectedRecords, recordFilter) {
         if (!w2ui.recordSelectorGrid) {
-            var grid = {
+            new w2grid({
                 name: 'recordSelectorGrid',
                 show: { selectColumn: true },
                 multiSelect: true,
                 columns: [
-                    { field: 'schemaName', caption: 'Schema Name', size: '30%', sortable: true, searchable: true },
-                    { field: 'sourceText', caption: 'Source Text', size: '70%', sortable: true, searchable: true }
+                    { field: 'schemaName', text: 'Schema Name', size: '30%', sortable: true, searchable: true },
+                    { field: 'sourceText', text: 'Source Text', size: '70%', sortable: true, searchable: true }
                 ],
                 records: [],
                 onSelect: function(event) {
@@ -754,11 +749,6 @@
                 onCollapse: function(event) {
                     event.preventDefault();
                 }
-            };
-
-            $(function () {
-                // initialization in memory
-                $().w2grid(grid);
             });
         }
 
@@ -817,7 +807,7 @@
             body    : '<div id="main" style="position: absolute; left: 5px; top: 5px; right: 5px; bottom: 5px;"></div>',
             onOpen  : function (event) {
                 event.onComplete = function () {
-                    $('#w2ui-popup #main').w2render('recordSelectorGrid');
+                    w2ui.recordSelectorGrid.render('#w2ui-popup #main');
                     w2ui.recordSelectorGrid.records.slice().forEach(function(r) { w2ui.recordSelectorGrid.expand(r.recid); });
 
                     if (preselectedRecords && preselectedRecords.length > 0) {
@@ -833,9 +823,9 @@
                 };
             },
             onToggle: function (event) {
-                $(w2ui.recordSelectorGrid.box).hide();
+                w2ui.recordSelectorGrid.box.style.display = 'none';
                 event.onComplete = function () {
-                    $(w2ui.recordSelectorGrid.box).show();
+                    w2ui.recordSelectorGrid.box.style.display = '';
                     w2ui.recordSelectorGrid.resize();
                 }
             }
@@ -868,11 +858,11 @@
                 continue;
             }
 
-            languageItems.push({ id: availableLanguages[i].field, text: availableLanguages[i].caption });
+            languageItems.push({ id: availableLanguages[i].field, text: availableLanguages[i].text });
         }
 
         if (!w2ui.findAndReplace) {
-            $().w2form({
+            new w2form({
                 name: 'findAndReplace',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
@@ -939,7 +929,7 @@
     function OpenFindAndReplaceDialog () {
         InitializeFindAndReplaceDialog()
         .then(function() {
-            $().w2popup('open', {
+            w2popup.open({
                 title   : 'Find and Replace',
                 name    : 'findAndReplacePopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
@@ -948,16 +938,15 @@
                 height  : 300,
                 showMax : true,
                 onToggle: function (event) {
-                    $(w2ui.findAndReplace.box).hide();
+                    w2ui.findAndReplace.box.style.display = 'none';
                     event.onComplete = function () {
-                        $(w2ui.findAndReplace.box).show();
+                        w2ui.findAndReplace.box.style.display = '';
                         w2ui.findAndReplace.resize();
                     }
                 },
                 onOpen: function (event) {
                     event.onComplete = function () {
-                        // specifying an onOpen handler instead is equivalent to specifying an onBeforeOpen handler, which would make this code execute too early and hence not deliver.
-                        $('#w2ui-popup #form').w2render('findAndReplace');
+                        w2ui.findAndReplace.render('#w2ui-popup #form');
                     }
                 }
             });
@@ -1189,7 +1178,7 @@
 
     function InitializeGrid (entities) {
         var filterItems = [
-            { type: 'menu-radio', id: 'solutionSelect', img: 'icon-folder',
+            { type: 'menu-radio', id: 'solutionSelect', icon: 'icon-folder',
                 text: function (item) {
                     var el = this.get('solutionSelect:' + item.selected);
                     if (el) {
@@ -1203,7 +1192,7 @@
                     { text: '--' }
                 ]
             },
-            { type: 'menu-radio', id: 'entitySelect', img: 'icon-folder',
+            { type: 'menu-radio', id: 'entitySelect', icon: 'icon-folder',
                 text: function (item) {
                     var text = item.selected;
                     var el = this.get('entitySelect:' + item.selected);
@@ -1221,7 +1210,7 @@
                     { text: '--' }
                 ]
             },
-            { type: 'menu-radio', id: 'type', img: 'icon-folder',
+            { type: 'menu-radio', id: 'type', icon: 'icon-folder',
                 text: function (item) {
                     var text = item.selected;
                     var el   = this.get('type:' + item.selected);
@@ -1247,7 +1236,7 @@
                     { id: 'globalOptionSets', text: '4. Global Option Sets', icon: 'fa-picture' }
                 ]
             },
-            { type: 'menu-radio', id: 'component', img: 'icon-folder',
+            { type: 'menu-radio', id: 'component', icon: 'icon-folder',
                 text: function (item) {
                     var text = item.selected;
                     var el   = this.get('component:' + item.selected);
@@ -1260,14 +1249,14 @@
                 ]
             },
             { type: 'break' },
-            { type: 'button', id: 'load', text: 'Load', img:'w2ui-icon-reload', onClick: LoadHandler },
+            { type: 'button', id: 'load', text: 'Load', icon:'w2ui-icon-reload', onClick: LoadHandler },
             { type: 'spacer' },
             { type: 'break' },
-            { type: 'button', id: 'about', text: 'About', img:'icon-about' },
-            { type: 'button', id: 'help', text: 'Help', img:'w2ui-icon-info' }
+            { type: 'button', id: 'about', text: 'About', icon:'icon-about' },
+            { type: 'button', id: 'help', text: 'Help', icon:'w2ui-icon-info' }
         ];
 
-        $('#filterbar').w2toolbar({
+        new w2toolbar({
             name: 'filterbar',
             items: filterItems,
             onClick: function (event) {
@@ -1350,7 +1339,7 @@
                     }
                 }
             }
-        });
+        }).render('#filterbar');
 
         // Hide entity-dependent items on initial load (entity defaults to None)
         w2ui['filterbar'].hide('type:allInOne');
@@ -1367,7 +1356,7 @@
         w2ui['filterbar'].hide('type:bpf');
 
         var items = [
-            { type: 'button', hidden: true, id: 'removeOverriddenAttributeLabels', text: 'Remove Overridden Attribute Labels', img:'w2ui-icon-cross', onClick: function(event) {
+            { type: 'button', hidden: true, id: 'removeOverriddenAttributeLabels', text: 'Remove Overridden Attribute Labels', icon:'w2ui-icon-cross', onClick: function(event) {
                 FormHandler.RemoveOverriddenCellLabels();
             }}
         ];
@@ -1380,37 +1369,38 @@
 
         aiTranslateMenuItems.push({ id: 'aiSettings', text: 'AI Settings', icon: 'icon-page' });
 
-        items.push({ type: 'menu', id: 'aiTranslate', text: 'AI Translate', img: 'icon-page',
+        items.push({ type: 'menu', id: 'aiTranslate', text: 'AI Translate', icon: 'icon-page',
             items: aiTranslateMenuItems
         });
 
         items.push({ type: 'break' });
 
-        items.push({ type: 'button', id: 'applyDictionary', text: 'Apply Dictionary', img:'icon-page', onClick: function () {
+        items.push({ type: 'button', id: 'applyDictionary', text: 'Apply Dictionary', icon:'icon-page', onClick: function () {
             TranslationHandler.ShowApplyDictionaryPrompt();
         } });
 
-        items.push({ type: 'button', id: 'dictionary', text: 'Dictionary', img:'icon-page', onClick: function () {
+        items.push({ type: 'button', id: 'dictionary', text: 'Dictionary', icon:'icon-page', onClick: function () {
             if (window.TranslationDictionaryService && TranslationDictionaryService.ShowDictionaryPrompt) {
                 TranslationDictionaryService.ShowDictionaryPrompt();
             }
         } });
 
         items.push({ type: 'break', id: 'break-filter' });
-        items.push({ type: 'check', id: 'filterUntranslated', img: 'icon-funnel', tooltip: 'Show only untranslated records', onClick: function () {
+        items.push({ type: 'check', id: 'filterUntranslated', icon: 'icon-funnel', tooltip: 'Show only untranslated records', onClick: function () {
             ToggleUntranslatedFilter();
         } });
 
         items.push({ type: 'spacer' });
 
         if (XrmTranslator.showDebugButton) {
-            items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', img:'icon-page', onClick: function () {
+            items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', icon:'icon-page', onClick: function () {
                 TranslationHandler.ApplyDebugTranslations();
             } });
         }
 
-        $('#grid').w2grid({
+        new w2grid({
             name: 'grid',
+            box: '#grid',
             show: {
                 toolbar: true,
                 footer: true,
@@ -1419,10 +1409,10 @@
             },
             multiSearch: true,
             searches: [
-                { field: 'schemaName', caption: 'Schema Name', type: 'text' }
+                { field: 'schemaName', text: 'Schema Name', type: 'text' }
             ],
             columns: [
-                { field: 'schemaName', caption: 'Schema Name', size: XrmTranslator.defaultSchemaNameSize, sortable: true, resizable: true, frozen: true }
+                { field: 'schemaName', text: 'Schema Name', size: XrmTranslator.defaultSchemaNameSize, sortable: true, resizable: true, frozen: true }
             ],
             onSave: function (event) {
                 currentHandler.Save();
@@ -1448,12 +1438,12 @@
                     }
                 }
             }
-        });
+        }).render();
 
         // Insert items before built-in grid toolbar items
         var gridToolbar = w2ui['grid_toolbar'];
 
-        gridToolbar.insert('w2ui-reload', { type: 'menu', id: 'toggle', img: 'icon-folder',
+        gridToolbar.insert('w2ui-reload', { type: 'menu', id: 'toggle', icon: 'icon-folder',
             text: "Toggle",
             items: [
                 { type: 'button', text: 'Expand all records', id: 'expandAll' },
@@ -1463,7 +1453,7 @@
         gridToolbar.insert('w2ui-reload', { type: 'break', id: 'break-toggle' });
 
         if (!XrmTranslator.config.hideFindAndReplace) {
-            gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: 'Find and Replace', img:'icon-page', id: 'findReplace', onClick: function (event) {
+            gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: 'Find and Replace', icon:'icon-page', id: 'findReplace', onClick: function (event) {
                 OpenFindAndReplaceDialog();
             } });
         }
@@ -1480,30 +1470,22 @@
         var _grid = w2ui.grid;
         var _origLock = _grid.lock.bind(_grid);
         var _origUnlock = _grid.unlock.bind(_grid);
-        var _filterbar = $("#filterbar");
+        var _filterbar = document.getElementById("filterbar");
 
         // Create an overlay div matching w2ui's .w2ui-lock style
-        var _filterbarLock = $('<div>').css({
-            display: "none",
-            position: "absolute",
-            zIndex: 10,
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0,0,0,0.1)",
-            pointerEvents: "auto"
-        });
-        _filterbar.css("position", "relative").append(_filterbarLock);
+        var _filterbarLock = document.createElement('div');
+        _filterbarLock.style.cssText = "display:none;position:absolute;z-index:10;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,0.1);pointer-events:auto;";
+        _filterbar.style.position = "relative";
+        _filterbar.appendChild(_filterbarLock);
 
         _grid.lock = function(msg, showSpinner) {
             _origLock(msg, showSpinner);
-            _filterbarLock.show();
+            _filterbarLock.style.display = '';
         };
 
         _grid.unlock = function() {
             _origUnlock();
-            _filterbarLock.hide();
+            _filterbarLock.style.display = 'none';
         };
 
         XrmTranslator.LockGrid("Loading entities");
