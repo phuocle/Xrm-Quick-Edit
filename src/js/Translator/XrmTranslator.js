@@ -289,11 +289,6 @@
         }
     };
 
-    // Stub — locking feature was removed; handlers still call this after save.
-    XrmTranslator.ReleaseLockAndPrompt = function () {
-        return Promise.resolve();
-    };
-
     XrmTranslator.SetUserLanguage = function (userId, language) {
         return WebApiClient.Update({
             overriddenSetName: "usersettingscollection",

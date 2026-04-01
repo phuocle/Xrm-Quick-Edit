@@ -263,9 +263,6 @@
             // WebResources can't be added with defined componenent settings or DoNotIncludeSubcomponents flag set to true
             return XrmTranslator.AddToSolution(ids, XrmTranslator.ComponentType.WebResource, true, true);
         })
-        .then(function(response) {
-            return XrmTranslator.ReleaseLockAndPrompt();
-        })
         .then(function (response) {
             XrmTranslator.LockGrid("Reloading");
 

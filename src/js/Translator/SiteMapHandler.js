@@ -459,9 +459,6 @@
             );
         })
         .then(function () {
-            return XrmTranslator.ReleaseLockAndPrompt();
-        })
-        .then(function () {
             XrmTranslator.LockGrid("Reloading");
 
             // Reload the same sitemap by id to avoid GUID filter formatting issues.

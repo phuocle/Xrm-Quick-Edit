@@ -409,9 +409,6 @@
             });
         })
         .then(function() {
-            return XrmTranslator.ReleaseLockAndPrompt();
-        })
-        .then(function() {
             return AllInOneHandler.Load();
         })
         .catch(function(err) {

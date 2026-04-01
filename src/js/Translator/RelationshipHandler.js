@@ -330,9 +330,6 @@
                 return XrmTranslator.Publish();
             })
             .then(function () {
-                return XrmTranslator.ReleaseLockAndPrompt();
-            })
-            .then(function () {
                 XrmTranslator.LockGrid("Reloading");
                 return RelationshipHandler.Load();
             })

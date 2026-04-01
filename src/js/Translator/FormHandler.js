@@ -694,9 +694,6 @@
                 return XrmTranslator.Publish();
             }
         })
-        .then(function(response) {
-            return XrmTranslator.ReleaseLockAndPrompt();
-        })
         .then(function (response) {
             XrmTranslator.LockGrid("Reloading");
 

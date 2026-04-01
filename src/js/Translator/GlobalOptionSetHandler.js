@@ -207,9 +207,6 @@
                 return XrmTranslator.AddToSolution(optionSetIds, XrmTranslator.ComponentType.OptionSet, true, true);
             })
             .then(function () {
-                return XrmTranslator.ReleaseLockAndPrompt();
-            })
-            .then(function () {
                 XrmTranslator.LockGrid("Reloading");
                 return GlobalOptionSetHandler.Load();
             })

@@ -500,9 +500,6 @@
 
         return BpfHandler.SaveOnly()
             .then(function () {
-                return XrmTranslator.ReleaseLockAndPrompt();
-            })
-            .then(function () {
                 XrmTranslator.LockGrid("Reloading");
                 return BpfHandler.Load();
             })
