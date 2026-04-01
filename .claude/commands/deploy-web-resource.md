@@ -37,13 +37,17 @@ If `.env` is missing or any of these variables are not set, tell the user:
 
 **Step 4: Find the CRM unique name from the mapping file**
 
-Read the mapping file at `.claude/mapping.xml` in the project root. This file contains `<File>` entries mapping `LocalPath` to `UniqueName`.
+Determine which mapping file to use based on the file path:
+- If the file path starts with `src2/` → use `.claude/mapping-v2.xml`
+- Otherwise → use `.claude/mapping.xml`
+
+Read the chosen mapping file. It contains `<File>` entries mapping `LocalPath` to `UniqueName`.
 
 Find the entry where `LocalPath` matches `$ARGUMENTS`. Extract the `UniqueName` attribute value.
 
 If no mapping is found, tell the user:
 
-> No CRM mapping found for `$ARGUMENTS`. Check `.claude/mapping.xml` to ensure this file is mapped to a web resource.
+> No CRM mapping found for `$ARGUMENTS`. Check the mapping file (`.claude/mapping.xml` for src/, `.claude/mapping-v2.xml` for src2/) to ensure this file is mapped to a web resource.
 
 **Step 5: Deploy using devkit CLI**
 

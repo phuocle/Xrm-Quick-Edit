@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Mapping SolutionName="XrmQuickTranslate">
+  <!-- CSS -->
+  <File LocalPath="src2/lib/w2ui-2.0.min.css" UniqueName="pl_/XrmQuickTranslate/css/w2ui.css" />
+  <File LocalPath="src2/css/style.css" UniqueName="pl_/XrmQuickTranslate/css/style.css" />
+
+  <!-- HTML -->
+  <File LocalPath="src2/html/TranslationGrid.html" UniqueName="pl_/XrmQuickTranslate/html/TranslationGrid.html" />
+  <File LocalPath="src2/html/PropertyEditorGrid.html" UniqueName="pl_/XrmQuickTranslate/html/PropertyEditorGrid.html" />
+
+  <!-- JS Libraries -->
+  <File LocalPath="src2/lib/w2ui-2.0.min.js" UniqueName="pl_/XrmQuickTranslate/js/w2ui.js" />
+  <File LocalPath="src2/lib/WebApiClient.js" UniqueName="pl_/XrmQuickTranslate/js/WebApiClient.js" />
+
+  <!-- JS Translator -->
+  <File LocalPath="src2/js/Translator/AllInOneHandler.js" UniqueName="pl_/XrmQuickTranslate/js/AllInOneHandler.js" />
+  <File LocalPath="src2/js/Translator/AttributeHandler.js" UniqueName="pl_/XrmQuickTranslate/js/AttributeHandler.js" />
+  <File LocalPath="src2/js/Translator/BpfHandler.js" UniqueName="pl_/XrmQuickTranslate/js/BpfHandler.js" />
+  <File LocalPath="src2/js/Translator/ChartHandler.js" UniqueName="pl_/XrmQuickTranslate/js/ChartHandler.js" />
+  <File LocalPath="src2/js/Translator/ContentSnippetHandler.js" UniqueName="pl_/XrmQuickTranslate/js/ContentSnippetHandler.js" />
+  <File LocalPath="src2/js/Translator/DialogHelper.js" UniqueName="pl_/XrmQuickTranslate/js/DialogHelper.js" />
+  <File LocalPath="src2/js/Translator/EntityHandler.js" UniqueName="pl_/XrmQuickTranslate/js/EntityHandler.js" />
+  <File LocalPath="src2/js/Translator/FormHandler.js" UniqueName="pl_/XrmQuickTranslate/js/FormHandler.js" />
+  <File LocalPath="src2/js/Translator/FormMetaHandler.js" UniqueName="pl_/XrmQuickTranslate/js/FormMetaHandler.js" />
+  <File LocalPath="src2/js/Translator/GlobalOptionSetHandler.js" UniqueName="pl_/XrmQuickTranslate/js/GlobalOptionSetHandler.js" />
+  <File LocalPath="src2/js/Translator/OptionSetHandler.js" UniqueName="pl_/XrmQuickTranslate/js/OptionSetHandler.js" />
+  <File LocalPath="src2/js/Translator/RelationshipHandler.js" UniqueName="pl_/XrmQuickTranslate/js/RelationshipHandler.js" />
+  <File LocalPath="src2/js/Translator/SiteMapHandler.js" UniqueName="pl_/XrmQuickTranslate/js/SiteMapHandler.js" />
+  <File LocalPath="src2/js/Translator/TranslationDictionaryService.js" UniqueName="pl_/XrmQuickTranslate/js/TranslationDictionaryService.js" />
+  <File LocalPath="src2/js/Translator/TranslationHandler.js" UniqueName="pl_/XrmQuickTranslate/js/TranslationHandler.js" />
+  <File LocalPath="src2/js/Translator/ViewHandler.js" UniqueName="pl_/XrmQuickTranslate/js/ViewHandler.js" />
+  <File LocalPath="src2/js/Translator/WebResourceHandler.js" UniqueName="pl_/XrmQuickTranslate/js/WebResourceHandler.js" />
+  <File LocalPath="src2/js/Translator/XrmTranslator.js" UniqueName="pl_/XrmQuickTranslate/js/XrmTranslator.js" />
+
+  <!-- JS PropertyEditor -->
+  <File LocalPath="src2/js/PropertyEditor/AttributePropertyHandler.js" UniqueName="pl_/XrmQuickTranslate/js/AttributePropertyHandler.js" />
+  <File LocalPath="src2/js/PropertyEditor/EntityPropertyHandler.js" UniqueName="pl_/XrmQuickTranslate/js/EntityPropertyHandler.js" />
+  <File LocalPath="src2/js/PropertyEditor/XrmPropertyEditor.js" UniqueName="pl_/XrmQuickTranslate/js/XrmPropertyEditor.js" />
+
+  <!-- Image -->
+  <File LocalPath="src2/img/app-icon.svg" UniqueName="pl_/img/app-icon.svg" />
+</Mapping>
