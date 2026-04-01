@@ -993,7 +993,7 @@
                 continue;
             }
 
-            if (rec.w2ui && rec.w2ui.children) {
+            if (rec.w2ui && rec.w2ui.children && rec.w2ui.children.length > 0) {
                 // Node with children: recurse, keep only if any leaf descendant is untranslated
                 var filteredChildren = filterRecordsRecursive(rec.w2ui.children, targetColumns);
 
@@ -1002,8 +1002,8 @@
                     clone.w2ui.children = filteredChildren;
                     result.push(clone);
                 }
-            } else {
-                // Leaf node: check if untranslated
+            } else if (!rec._isGroupNode) {
+                // Leaf node: check if untranslated (skip structural group nodes)
                 if (isRecordUntranslated(rec, targetColumns)) {
                     result.push(rec);
                 }
@@ -1032,7 +1032,15 @@
 
             unfilteredRecords = JSON.parse(JSON.stringify(grid.records));
 
-            var filtered = filterRecordsRecursive(grid.records, targetColumns);
+            // Use only root-level records for filtering. When w2ui expands
+            // tree nodes it splices children into grid.records as flat entries
+            // (with parent_recid set). Filtering via w2ui.children already
+            // reaches those children, so we skip the flat duplicates here.
+            var rootRecords = grid.records.filter(function(r) {
+                return !r.w2ui || !r.w2ui.parent_recid;
+            });
+
+            var filtered = filterRecordsRecursive(rootRecords, targetColumns);
 
             grid.clear();
             grid.add(filtered);
