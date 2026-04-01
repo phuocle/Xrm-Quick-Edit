@@ -2,10 +2,6 @@ node_modules/*
 Publish/*
 .mcp.json
 .env
-.vscode/mcp.json
-.codex/config.toml
-TestConsole/
-*.sln
 solutions/1.before/
 solutions/2.unpack/
 solutions/3.after/
