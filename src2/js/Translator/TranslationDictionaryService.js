@@ -26,11 +26,11 @@
     "use strict";
 
     var BASE_SOLUTION_UNIQUE_NAME = "XrmQuickEdit";
-    var DATA_SOLUTION_DISPLAY_NAME = "Xrm Quick Edit Data";
+    var DATA_SOLUTION_DISPLAY_NAME = "Xrm Quick Translate Data";
     var DATA_SOLUTION_UNIQUE_NAME = "XrmQuickEditData";
     var DICTIONARY_WEBRESOURCE_UNIQUE_NAME = "oss_XrmQuickEdit/data/TranslationDictionary.xml";
-    var DICTIONARY_WEBRESOURCE_DISPLAY_NAME = "Xrm Quick Edit Translation Dictionary";
-    var DICTIONARY_WEBRESOURCE_DESCRIPTION = "Stores customer dictionary whitelist for Xrm Quick Edit translation.";
+    var DICTIONARY_WEBRESOURCE_DISPLAY_NAME = "Xrm Quick Translate Translation Dictionary";
+    var DICTIONARY_WEBRESOURCE_DESCRIPTION = "Stores customer dictionary whitelist for Xrm Quick Translate translation.";
     var CACHE_KEY = "XrmQuickEdit_DictionaryStorage_v1";
 
     var storageInfo = null;

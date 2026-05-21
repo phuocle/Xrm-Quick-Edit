@@ -1,4 +1,4 @@
-/* Shared styles for Xrm Quick Edit dashboards */
+/* v2.3 Shared styles for Xrm Quick Translate dashboards */
 
 /* Match filterbar appearance to the w2ui grid toolbar */
 #filterbar {
@@ -11,14 +11,35 @@
     background-color: transparent;
 }
 
-/* Custom funnel/filter icon for the untranslated toggle */
+/* /* ===== Restored Custom Base64 Icons for w2ui 2.0 ===== */
+.icon-folder {
+    background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLxZO7ihRBFIa/6u0ZW7GHBUV0UQQTZzd3QdhMQxOfwMRXEANBMNQX0MzAzFAwEzHwARbNFDdwEd31Mj3X7a6uOr9BtzNjYjKBJ6nicP7v3KqcJFaxhBVtZUAK8OHlld2st7Xl3DJPVONP+zEUV4HqL5UDYHr5xvuQAjgl/Qs7TzvOOVAjxjlC+ePSwe6DfbVegLVuT4r14eTr6zvA8xSAoBLzx6pvj4l+DZIezuVkG9fY2H7YRQIMZIBwycmzH1/s3F8AapfIPNF3kQk7+kw9PWBy+IZOdg5Ug3mkAATy/t0usovzGeCUWTjCz0B+Sj0ekfdvkZ3abBv+U4GaCtJ1iEm6ANQJ6fEzrG/engcKw/wXQvEKxSEKQxRGKE7Izt+DSiwBJMUSm71rguMYhQKrBygOIRStf4TiFFRBvbRGKiQLWP29yRSHKBTtfdBmHs0BUpgvtgF4yRFR+NUKi0XZcYjCeCG2smkzLAHkbRBmP0/Uk26O5YnUActBp1GsAI+S5nRJJJal5K1aAMrq0d6Tm9uI6zjyf75dAe6tx/SsWeD//o2/Ab6IH3/h25pOAAAAAElFTkSuQmCC) no-repeat center !important;
+}
+
+.icon-page {
+    background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAINSURBVBgZBcG/r55zGAfg6/4+z3va01NHlYgzEfE7MdCIGISFgS4Gk8ViYyM2Mdlsko4GSf8Do0FLRCIkghhYJA3aVBtEz3nP89wf11VJvPDepdd390+8Nso5nESBQoq0pfvXm9fzWf19453LF85vASqJlz748vInb517dIw6EyYBIIG49u+xi9/c9MdvR//99MPPZ7+4cP4IZhhTPbwzT2d+vGoaVRRp1rRliVvHq+cfvM3TD82+7mun0o/ceO7NT+/4/KOXjwZU1ekk0840bAZzMQ2mooqh0A72d5x/6sB9D5zYnff3PoYBoWBgFKPKqDKqjCpjKr//dcu9p489dra88cydps30KswACfNEKanSaxhlntjJ8Mv12Paie+vZ+0+oeSwwQ0Iw1xAR1CiFNJkGO4wu3ZMY1AAzBI0qSgmCNJsJUEOtJSMaCTBDLyQ0CknAGOgyTyFFiLI2awMzdEcSQgSAAKVUmAeNkxvWJWCGtVlDmgYQ0GFtgg4pNtOwbBcwQy/Rife/2yrRRVI0qYCEBly8Z+P4qMEMy7JaVw72N568e+iwhrXoECQkfH91kY7jwwXMsBx1L93ZruqrK6uuiAIdSnTIKKPLPFcvay8ww/Hh+ufeznTXu49v95IMoQG3784gYXdTqvRmqn/Wpa/ADFX58MW3L71SVU9ETgEIQQQIOOzub+fhIvwPRDgeVjWDahIAAAAASUVORK5CYII=) no-repeat center !important;
+}
+
+.fa-camera {
+    background: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjNjg2ODY4IiBkPSJNMTQ5LjEgNjQuOEwxMzguNyA5Nkg2NEMyOC43IDk2IDAgMTI0LjcgMCAxNjBWNDE2YzAgMzUuMyAyOC43IDY0IDY0IDY0SDQ0OGMzNS4zIDAgNjQtMjguNyA2NC02NFYxNjBjMC0zNS4zLTI4LjctNjQtNjQtNjRIMzczLjNMMzYyLjkgNjQuOEMzNTYuNCA0NS4yIDMzOC4xIDMyIDMxNy40IDMySDE5NC42Yy0yMC43IDAtMzkgMTMuMi00NS41IDMyLjh6TTI1NiAxOTJhOTYgOTYgMCAxIDEgMCAxOTIgOTYgOTYgMCAxIDEgMC0xOTJ6Ii8+PC9zdmc+) no-repeat center !important;
+    background-size: 14px 14px !important;
+}
+
+.fa-picture {
+    background: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSIjNjg2ODY4IiBkPSJNMCA5NkMwIDYwLjcgMjguNyAzMiA2NCAzMkg0NDhjMzUuMyAwIDY0IDI4LjcgNjQgNjRWNDE2YzAgMzUuMy0yOC43IDY0LTY0IDY0SDY0Yy0zNS4zIDAtNjQtMjguNy02NC02NFY5NnpNMzIzLjggMjAyLjVjLTQuNS02LjYtMTEuNS0xMC41LTE5LjgtMTAuNXMtMTUuNCAzLjktMTkuOCAxMC41bC04NyAxMjcuNkwxNzAuNyAyOTdjLTQuNi01LjctMTEuNS05LTE4LjctOXMtMTQuMiAzLjMtMTguNyA5bC02NCA4MGMtNS44IDcuMi02LjkgMTcuMS0yLjkgMjUuNHMxMi40IDEzLjYgMjEuNiAxMy42aDk2IDMySDQyNGM4LjkgMCAxNy4xLTQuOSAyMS4yLTEyLjhzMy40LTE3LjQtMS44LTI0LjhsLTEyMC0xNzZ6TTExMiAxOTJhNDggNDggMCAxIDAgMC05NiA0OCA0OCAwIDEgMCAwIDk2eiIvPjwvc3ZnPg==) no-repeat center !important;
+    background-size: 14px 14px !important;
+}
+
 .icon-funnel {
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 2h14l-5 6v5l-4 1V8z' fill='%23666'/%3E%3C/svg%3E") no-repeat center center !important;
+    background: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTEgMmgxNGwtNSA2djVsLTQgMVY4eiIgZmlsbD0iIzY2NiIvPjwvc3ZnPg==) no-repeat center !important;
     background-size: 15px 15px !important;
 }
 
-/* Custom about icon (circle with question mark) */
 .icon-about {
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='none' stroke='%23666' stroke-width='1.4'/%3E%3Ctext x='8' y='11.5' text-anchor='middle' font-size='10' font-family='serif' font-style='italic' font-weight='bold' fill='%23666'%3Ei%3C/text%3E%3C/svg%3E") no-repeat center center !important;
+    background: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PGNpcmNsZSBjeD0iOCIgY3k9IjgiIHI9IjciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzY2NiIgc3Ryb2tlLXdpZHRoPSIxLjQiLz48dGV4dCB4PSI4IiB5PSIxMS41IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjEwIiBmb250LWZhbWlseT0ic2VyaWYiIGZvbnQtc3R5bGU9Iml0YWxpYyIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiM2NjYiPmk8L3RleHQ+PC9zdmc+) no-repeat center !important;
     background-size: 15px 15px !important;
 }
+
+
+
+

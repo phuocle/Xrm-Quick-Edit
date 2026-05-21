@@ -1,3 +1,4 @@
+/* v2.3 */
 /* @preserve
  * MIT License
  *
@@ -1057,24 +1058,21 @@
     }
 
     function ShowAbout () {
-        var html = '<div style="padding: 20px 25px; font-size: 13px; line-height: 1.8; text-align: center;">' +
-            '<h2 style="margin: 0 0 5px 0;">Xrm Quick Edit</h2>' +
-            '<p style="margin: 0 0 15px 0; color: #888;">Translation Management for Dynamics 365 / Dataverse</p>' +
-            '<hr style="border: none; border-top: 1px solid #ddd; margin: 15px 0;">' +
-            '<p style="text-align: left;">This project is a fork of ' +
-            '<a href="https://github.com/XRM-OSS/Xrm-Quick-Edit" target="_blank" rel="noopener noreferrer">XRM-OSS/Xrm-Quick-Edit</a>. ' +
-            'Special thanks to the original author <a href="https://github.com/DigitalFlow" target="_blank" rel="noopener noreferrer">Florian Kr&ouml;nert (DigitalFlow)</a> ' +
-            'for creating and open-sourcing this tool.</p>' +
-            '<p style="text-align: left;">Continued development and enhancements by ' +
-            '<a href="https://github.com/phuocle" target="_blank" rel="noopener noreferrer">Phuoc Le</a>, ' +
-            'including AI-powered translation, dictionary management, All-In-One mode, and more.</p>' +
+        var html = '<div style="padding: 25px 30px; font-size: 15px; line-height: 1.6; text-align: center;">' +
+            '<h2 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Xrm Quick Translate</h2>' +
+            '<p style="margin: 0 0 15px 0; color: #777; font-size: 14px;">Complete Translation Management UI for Dynamics 365 / Dataverse</p>' +
+            '<hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;">' +
+            '<p style="text-align: justify; text-align-last: center; font-size: 14px; margin: 0; color: #444;">Developed by ' +
+            '<a href="https://github.com/phuocle" target="_blank" rel="noopener noreferrer" style="font-weight: 500; text-decoration: none;">Phuoc Le</a>, ' +
+            'featuring AI-powered translation, intelligent dictionary management, All-In-One bulk translation mode, ' +
+            'and a beautifully optimized workflow.</p>' +
             '</div>';
 
         w2popup.open({
             title: 'About',
             body: html,
-            width: 500,
-            height: 400,
+            width: 580,
+            height: 310,
             modal: true,
             showClose: true,
             buttons: '<button class="w2ui-btn" onclick="w2popup.close();">Close</button>'
@@ -1125,7 +1123,7 @@
             '<li><b>Apply Dictionary</b> — Batch-apply existing dictionary entries to all matching records in the current grid without calling AI. ' +
             'Supports three modes: <i>All Overwrite</i>, <i>All Missing</i>, <i>All Missing Or Identical</i>.</li>' +
             '<li><b>Storage:</b> Dictionary data is saved as a web resource (<code>oss_XrmQuickEdit/data/TranslationDictionary.xml</code>) ' +
-            'inside an unmanaged solution named <b>Xrm Quick Edit Data</b> (unique name: <code>XrmQuickEditData</code>). ' +
+            'inside an unmanaged solution named <b>Xrm Quick Translate Data</b> (unique name: <code>XrmQuickEditData</code>). ' +
             'This solution is auto-created on first use.</li>' +
             '</ul>' +
             '</div>';
@@ -1252,7 +1250,7 @@
             { type: 'button', id: 'load', text: 'Load', icon:'w2ui-icon-reload', onClick: LoadHandler },
             { type: 'spacer' },
             { type: 'break' },
-            { type: 'button', id: 'about', text: 'About', icon:'icon-about' },
+            { type: 'button', id: 'about', text: 'About', icon: 'w2ui-icon-info' },
             { type: 'button', id: 'help', text: 'Help', icon:'w2ui-icon-info' }
         ];
 
@@ -1375,25 +1373,25 @@
 
         items.push({ type: 'break' });
 
-        items.push({ type: 'button', id: 'applyDictionary', text: 'Apply Dictionary', icon:'icon-page', onClick: function () {
+        items.push({ type: 'button', id: 'applyDictionary', text: 'Apply Dictionary', icon: 'icon-page', onClick: function () {
             TranslationHandler.ShowApplyDictionaryPrompt();
         } });
 
-        items.push({ type: 'button', id: 'dictionary', text: 'Dictionary', icon:'icon-page', onClick: function () {
+        items.push({ type: 'button', id: 'dictionary', text: 'Dictionary', icon: 'icon-page', onClick: function () {
             if (window.TranslationDictionaryService && TranslationDictionaryService.ShowDictionaryPrompt) {
                 TranslationDictionaryService.ShowDictionaryPrompt();
             }
         } });
 
         items.push({ type: 'break', id: 'break-filter' });
-        items.push({ type: 'check', id: 'filterUntranslated', icon: 'icon-funnel', tooltip: 'Show only untranslated records', onClick: function () {
+        items.push({ type: 'check', id: 'filterUntranslated', icon: 'w2ui-icon-search', tooltip: 'Show only untranslated records', onClick: function () {
             ToggleUntranslatedFilter();
         } });
 
         items.push({ type: 'spacer' });
 
         if (XrmTranslator.showDebugButton) {
-            items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', icon:'icon-page', onClick: function () {
+            items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', icon: 'icon-page', onClick: function () {
                 TranslationHandler.ApplyDebugTranslations();
             } });
         }
@@ -1453,7 +1451,7 @@
         gridToolbar.insert('w2ui-reload', { type: 'break', id: 'break-toggle' });
 
         if (!XrmTranslator.config.hideFindAndReplace) {
-            gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: 'Find and Replace', icon:'icon-page', id: 'findReplace', onClick: function (event) {
+            gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: 'Find and Replace', icon: 'icon-page', id: 'findReplace', onClick: function (event) {
                 OpenFindAndReplaceDialog();
             } });
         }
@@ -1773,3 +1771,7 @@
         });
     }
 } (window.XrmTranslator = window.XrmTranslator || {}));
+
+
+
+
