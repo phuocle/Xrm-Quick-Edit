@@ -92,6 +92,26 @@
         return defaultValue;
     }
 
+    function PostJson(url, headers, body) {
+        return fetch(url, {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, headers || {}),
+            body: JSON.stringify(body)
+        })
+        .then(function(response) {
+            return response.text()
+            .then(function(text) {
+                var data = text ? JSON.parse(text) : {};
+
+                if (!response.ok) {
+                    var errorMessage = (data && data.error && data.error.message) || response.statusText || "Request failed";
+                    throw new Error(errorMessage);
+                }
+
+                return data;
+            });
+        });
+    }
 
     function GetLanguageIsoByLcid (lcid) {
         var locByLocales = locales.find(function(loc) { return loc.localeid === lcid; });
@@ -156,8 +176,6 @@
             encodeURIComponent(modelName) + ":generateContent";
 
         this.GetBatchTranslations = function(fromLanguage, destLanguage, phrases) {
-            $.support.cors = true;
-
             var systemInstructions = "You are a professional translator for a Microsoft Dynamics CRM / Dataverse system. " +
                 "Translate the following labels from " + fromLanguage + " to " + destLanguage + ". " +
                 (customPrompt ? customPrompt + " " : "") +
@@ -174,14 +192,7 @@
                 }]
             };
 
-            return WebApiClient.Promise.resolve($.ajax({
-                url: apiUrl + "?key=" + encodeURIComponent(apiKey),
-                type: "POST",
-                crossDomain: true,
-                contentType: "application/json",
-                dataType: "json",
-                data: JSON.stringify(requestBody)
-            }))
+            return PostJson(apiUrl + "?key=" + encodeURIComponent(apiKey), null, requestBody)
             .then(function(response) {
                 if (!response || !response.candidates || !response.candidates[0] ||
                     !response.candidates[0].content || !response.candidates[0].content.parts ||
@@ -259,8 +270,6 @@
         var apiUrl = "https://api.openai.com/v1/chat/completions";
 
         this.GetBatchTranslations = function(fromLanguage, destLanguage, phrases) {
-            $.support.cors = true;
-
             var systemPrompt = "You are a professional translator for a Microsoft Dynamics CRM / Dataverse system. " +
                 "Translate the following labels from " + fromLanguage + " to " + destLanguage + ". " +
                 (customPrompt ? customPrompt + " " : "") +
@@ -278,17 +287,9 @@
                 ]
             };
 
-            return WebApiClient.Promise.resolve($.ajax({
-                url: apiUrl,
-                type: "POST",
-                crossDomain: true,
-                contentType: "application/json",
-                dataType: "json",
-                headers: {
-                    "Authorization": "Bearer " + apiKey
-                },
-                data: JSON.stringify(requestBody)
-            }))
+            return PostJson(apiUrl, {
+                "Authorization": "Bearer " + apiKey
+            }, requestBody)
             .then(function(response) {
                 if (!response || !response.choices || !response.choices[0] ||
                     !response.choices[0].message || !response.choices[0].message.content) {

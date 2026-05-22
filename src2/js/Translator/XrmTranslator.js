@@ -47,7 +47,7 @@
     XrmTranslator.defaultSchemaNameSize = "20%";
 
     // Toggle quick DEBUG autofill button in toolbar (true = show, false = hide).
-    XrmTranslator.showDebugButton = true;
+    XrmTranslator.showDebugButton = false;
 
     XrmTranslator.allEntities = [];
 

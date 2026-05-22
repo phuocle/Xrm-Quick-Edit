@@ -1,6 +1,6 @@
 # Export Solution
 
-Export the XrmQuickEdit solution from Dataverse, unpack it, clean non-English languages, and repack.
+Export the Xrm Quick Translate (XrmQuickTranslate) solution from Dataverse, unpack it, clean non-English languages, and repack.
 
 ## Instructions
 
@@ -36,8 +36,8 @@ If this fails, show the error and stop.
 Ensure the folder `solutions/1.before` exists (create if needed). Then export both managed and unmanaged:
 
 ```bash
-pac solution export --name XrmQuickEdit --path solutions/1.before/XrmQuickEdit.zip --overwrite
-pac solution export --name XrmQuickEdit --path solutions/1.before/XrmQuickEdit_managed.zip --managed --overwrite
+pac solution export --name XrmQuickTranslate --path solutions/1.before/XrmQuickTranslate.zip --overwrite
+pac solution export --name XrmQuickTranslate --path solutions/1.before/XrmQuickTranslate_managed.zip --managed --overwrite
 ```
 
 If either fails, show the full error output and stop.
@@ -47,7 +47,7 @@ If either fails, show the full error output and stop.
 Delete `solutions/2.unpack` if it exists, then unpack both:
 
 ```bash
-pac solution unpack --zipfile solutions/1.before/XrmQuickEdit.zip --folder solutions/2.unpack --packagetype Both --allowWrite true --clobber true
+pac solution unpack --zipfile solutions/1.before/XrmQuickTranslate.zip --folder solutions/2.unpack --packagetype Both --allowWrite true --clobber true
 ```
 
 Using `--packagetype Both` unpacks both managed and unmanaged into the same folder.
@@ -65,15 +65,15 @@ powershell -ExecutionPolicy Bypass -File solutions/clean-language.ps1 -Path solu
 Ensure the folder `solutions/3.after` exists (create if needed). Then pack both:
 
 ```bash
-pac solution pack --zipfile solutions/3.after/XrmQuickEdit.zip --folder solutions/2.unpack --packagetype Unmanaged
-pac solution pack --zipfile solutions/3.after/XrmQuickEdit_managed.zip --folder solutions/2.unpack --packagetype Managed
+pac solution pack --zipfile solutions/3.after/XrmQuickTranslate.zip --folder solutions/2.unpack --packagetype Unmanaged
+pac solution pack --zipfile solutions/3.after/XrmQuickTranslate_managed.zip --folder solutions/2.unpack --packagetype Managed
 ```
 
 **Step 7: Report result**
 
 Tell the user the pipeline succeeded and list the output files:
 
-- `solutions/1.before/XrmQuickEdit.zip` (original unmanaged)
-- `solutions/1.before/XrmQuickEdit_managed.zip` (original managed)
-- `solutions/3.after/XrmQuickEdit.zip` (English-only unmanaged)
-- `solutions/3.after/XrmQuickEdit_managed.zip` (English-only managed)
+- `solutions/1.before/XrmQuickTranslate.zip` (original unmanaged)
+- `solutions/1.before/XrmQuickTranslate_managed.zip` (original managed)
+- `solutions/3.after/XrmQuickTranslate.zip` (English-only unmanaged)
+- `solutions/3.after/XrmQuickTranslate_managed.zip` (English-only managed)
