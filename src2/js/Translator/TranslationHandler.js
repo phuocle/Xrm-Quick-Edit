@@ -894,7 +894,7 @@
                 style   : 'padding: 15px 0px 0px 0px',
                 width   : 650,
                 height  : 360,
-                showMax : true,
+                showMax : false,
                 onToggle: function (event) {
                     w2ui.translationPrompt.box.style.display = 'none';
                     event.onComplete = function () {

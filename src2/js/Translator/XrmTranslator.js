@@ -144,7 +144,86 @@
         var toolbar = GetToolbar();
         if (toolbar) {
             toolbar.refresh();
+            NormalizeGridSearchUiSoon();
         }
+    }
+
+    function NormalizeGridSearchUiSoon() {
+        NormalizeGridSearchUi();
+        setTimeout(NormalizeGridSearchUi, 0);
+        setTimeout(NormalizeGridSearchUi, 50);
+    }
+
+    function NormalizeGridSearchUi() {
+        var grid = w2ui && w2ui.grid ? w2ui.grid : null;
+        var gridBox = grid && grid.box ? grid.box : null;
+        if (!grid || !gridBox || !grid.name) {
+            return;
+        }
+
+        ConfigureSimpleGridSearch(grid);
+        RemoveGridSearchPanel(gridBox);
+
+        var searchName = gridBox.querySelector("#grid_" + grid.name + "_search_name");
+        var searchInput = gridBox.querySelector("#grid_" + grid.name + "_search_all");
+        var nameText = searchName ? searchName.querySelector(".name-text") : null;
+        var label = nameText ? String(nameText.textContent || "").trim() : "";
+        var hasValidSearchName = label && label.toLowerCase() !== "null" && label.toLowerCase() !== "undefined";
+
+        if (!hasValidSearchName) {
+            if (searchName) {
+                searchName.style.display = "none";
+            }
+            if (nameText) {
+                nameText.textContent = "";
+            }
+            grid.searchSelected = null;
+        }
+
+        if (searchInput) {
+            if (!hasValidSearchName) {
+                searchInput.readOnly = false;
+            }
+            if (String(searchInput.value || "").trim().toLowerCase() === "null" || (!hasValidSearchName && searchInput.value === " ")) {
+                searchInput.value = "";
+            }
+            searchInput.placeholder = "Search All Fields";
+        }
+
+        if (grid.last) {
+            if (!grid.last.field || String(grid.last.field).toLowerCase() === "null") {
+                grid.last.field = "all";
+            }
+            if (!grid.last.label || String(grid.last.label).toLowerCase() === "null") {
+                grid.last.label = "All Fields";
+            }
+        }
+    }
+
+    function RemoveGridSearchPanel(gridBox) {
+        var searchPanels = gridBox.querySelectorAll(".w2ui-grid-searches");
+        for (var i = 0; i < searchPanels.length; i++) {
+            searchPanels[i].remove();
+        }
+    }
+
+    function ConfigureSimpleGridSearch(grid) {
+        if (!grid || grid._xqtSimpleSearchConfigured) {
+            return;
+        }
+
+        if (grid.defaultOperator) {
+            grid.defaultOperator.text = "contains";
+        }
+        if (grid.show) {
+            grid.show.searchLogic = false;
+            grid.show.searchSave = false;
+        }
+
+        grid.searchOpen = function () {};
+        grid.searchShowFields = function () {};
+        grid.searchSuggest = function () {};
+        grid._xqtSimpleSearchConfigured = true;
     }
 
     function SetToolbarItemsVisible(ids, visible) {
@@ -189,6 +268,7 @@
         grid.unlock = function() {
             originalUnlock();
             SetToolbarLocked(false);
+            NormalizeGridSearchUiSoon();
         };
 
         grid._xqtToolbarLockPatched = true;
@@ -1579,15 +1659,18 @@
                 toolbarSearch: true,
                 toolbarReload: false
             },
-            multiSearch: true,
+            multiSearch: false,
             searches: [
-                { field: 'schemaName', text: 'Schema Name', type: 'text' }
+                { field: 'schemaName', text: 'Schema Name', type: 'text', operator: 'contains' }
             ],
             columns: [
                 { field: 'schemaName', text: 'Schema Name', size: XrmTranslator.defaultSchemaNameSize, sortable: true, resizable: true, frozen: true }
             ],
             onSave: function (event) {
                 currentHandler.Save();
+            },
+            onSearch: function (event) {
+                event.onComplete = NormalizeGridSearchUiSoon;
             },
             toolbar: {
                 items: toolbarItems,
@@ -1624,6 +1707,7 @@
         }
 
         PatchGridToolbarLock();
+        NormalizeGridSearchUiSoon();
         XrmTranslator.LockGrid("Loading entities");
     }
 
