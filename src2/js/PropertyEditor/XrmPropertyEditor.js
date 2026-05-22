@@ -97,12 +97,57 @@
         return w2ui.grid;
     }
 
+    function SetToolbarLocked(locked) {
+        if (w2ui.grid_toolbar && w2ui.grid_toolbar.box && w2ui.grid_toolbar.box.classList) {
+            w2ui.grid_toolbar.box.classList.toggle("xqt-toolbar-locked", !!locked);
+        }
+    }
+
+    function PatchGridToolbarLock() {
+        var grid = w2ui && w2ui.grid ? w2ui.grid : null;
+        if (!grid || grid._xqtToolbarLockPatched) {
+            return;
+        }
+
+        var originalLock = grid.lock.bind(grid);
+        var originalUnlock = grid.unlock.bind(grid);
+
+        grid.lock = function(message, showSpinner) {
+            originalLock(message, showSpinner);
+            SetToolbarLocked(true);
+        };
+
+        grid.unlock = function() {
+            originalUnlock();
+            SetToolbarLocked(false);
+        };
+
+        grid._xqtToolbarLockPatched = true;
+    }
+
+    function StripOrderPrefix(text) {
+        return String(text || "").replace(/^\d+\.\s*/, "");
+    }
+
+    function CompactToolbarText(text, maxLength) {
+        text = StripOrderPrefix(text);
+        maxLength = maxLength || 28;
+
+        if (text.length <= maxLength) {
+            return text;
+        }
+
+        return text.substring(0, maxLength - 1) + "...";
+    }
+
     XrmPropertyEditor.LockGrid = function (message) {
         XrmPropertyEditor.GetGrid().lock(message, true);
+        SetToolbarLocked(true);
     }
 
     XrmPropertyEditor.UnlockGrid = function () {
         XrmPropertyEditor.GetGrid().unlock();
+        SetToolbarLocked(false);
     }
 
     XrmPropertyEditor.Publish = function() {
@@ -182,47 +227,45 @@
             },
             toolbar: {
                 items: [
-                    { type: 'menu-radio', id: 'solutionSelect', icon: 'icon-folder',
+                    { type: 'menu-radio', id: 'solutionSelect', icon: 'icon-solution', tooltip: 'Solution',
                         text: function (item) {
                             var el = this.get('solutionSelect:' + item.selected);
                             if (el) {
-                                return 'Solution: ' + el.text;
+                                return CompactToolbarText(el.text, 24);
                             }
-                            return 'Choose solution';
+                            return 'Solution';
                         },
                         selected: 'all',
                         items: [
-                            { id: 'all', text: 'Default Solution' },
+                            { id: 'all', text: 'Default Solution', icon: 'icon-solution' },
                             { text: '--' }
                         ]
                     },
-                    { type: 'menu-radio', id: 'entitySelect', icon: 'icon-folder',
+                    { type: 'menu-radio', id: 'entitySelect', icon: 'icon-entity', tooltip: 'Entity',
                         text: function (item) {
-                            var text = item.selected;
                             var el = this.get('entitySelect:' + item.selected);
 
                             if (el) {
-                                return 'Entity: ' + el.text;
+                                return CompactToolbarText(el.text, 26);
                             }
                             else {
-                                return "Choose entity";
+                                return "Entity";
                             }
                         },
                         items: []
                     },
-                    { type: 'menu-radio', id: 'type', icon: 'icon-folder',
+                    { type: 'menu-radio', id: 'type', icon: 'icon-type', tooltip: 'Property type',
                         text: function (item) {
-                            var text = item.selected;
                             var el   = this.get('type:' + item.selected);
-                            return 'Type: ' + el.text;
+                            return el ? CompactToolbarText(el.text, 18) : 'Type';
                         },
                         selected: 'attributes',
                         items: [
-                            { id: 'attributes', text: 'Attributes', icon: 'fa-camera' }
-                            //{ id: 'entities', text: 'Entities', icon: 'fa-picture' }
+                            { id: 'attributes', text: 'Attributes', icon: 'icon-attribute' }
+                            //{ id: 'entities', text: 'Entities', icon: 'icon-entity' }
                         ]
                     },
-                    { type: 'button', id: 'load', text: 'Load', icon:'w2ui-icon-reload', onClick: function (event) {
+                    { type: 'button', id: 'load', text: 'Load', tooltip: 'Load selected property data', icon:'icon-load', onClick: function (event) {
                         var entity = XrmPropertyEditor.GetEntity();
 
                         if (!entity || !XrmPropertyEditor.GetType()) {
@@ -247,6 +290,7 @@
             }
         }).render();
 
+        PatchGridToolbarLock();
         XrmPropertyEditor.LockGrid("Loading entities");
     }
 
@@ -257,7 +301,11 @@
         for (var i = 0; i < entities.length; i++) {
             var entity = entities[i];
 
-            entitySelect.push(entity.SchemaName);
+            entitySelect.push({
+                id: entity.SchemaName,
+                text: entity.SchemaName,
+                icon: 'icon-entity'
+            });
             XrmPropertyEditor.entityMetadata[entity.SchemaName] = entity.MetadataId;
         }
 
@@ -287,7 +335,8 @@
             var solution = solutions[i];
             solutionSelect.push({
                 id: solution.solutionid,
-                text: solution.friendlyname + " (" + solution.uniquename + ")"
+                text: solution.friendlyname + " (" + solution.uniquename + ")",
+                icon: 'icon-solution'
             });
         }
 

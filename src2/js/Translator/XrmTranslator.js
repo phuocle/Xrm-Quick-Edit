@@ -70,6 +70,26 @@
     var baseLanguageRestoreLcid = null;
     var unfilteredRecords = null;
     var recordSelectorContext = null;
+    var ENTITY_DEPENDENT_TYPE_ITEMS = [
+        "type:allInOne",
+        "type:entitySeparator",
+        "type:attributes",
+        "type:options",
+        "type:forms",
+        "type:views",
+        "type:formMeta",
+        "type:entityMeta",
+        "type:relationships",
+        "type:charts",
+        "type:content",
+        "type:bpf"
+    ];
+    var GLOBAL_TYPE_ITEMS = [
+        "type:webresources",
+        "type:dashboards",
+        "type:sitemap",
+        "type:globalOptionSets"
+    ];
     var CONFIG_WEBRESOURCE_NAMES = [
         "pl_/XrmQuickTranslate/config/XrmQuickTranslateConfig.js"
     ];
@@ -114,6 +134,93 @@
                 CollapseRecord(record);
             }
         }
+    }
+
+    function GetToolbar() {
+        return w2ui && w2ui.grid_toolbar ? w2ui.grid_toolbar : null;
+    }
+
+    function RefreshToolbar() {
+        var toolbar = GetToolbar();
+        if (toolbar) {
+            toolbar.refresh();
+        }
+    }
+
+    function SetToolbarItemsVisible(ids, visible) {
+        var toolbar = GetToolbar();
+        if (!toolbar) {
+            return;
+        }
+
+        for (var i = 0; i < ids.length; i++) {
+            if (toolbar.get(ids[i])) {
+                if (visible) {
+                    toolbar.show(ids[i]);
+                } else {
+                    toolbar.hide(ids[i]);
+                }
+            }
+        }
+    }
+
+    function SetToolbarLocked(locked) {
+        var toolbar = GetToolbar();
+        var toolbarBox = toolbar && toolbar.box ? toolbar.box : null;
+        if (toolbarBox && toolbarBox.classList) {
+            toolbarBox.classList.toggle("xqt-toolbar-locked", !!locked);
+        }
+    }
+
+    function PatchGridToolbarLock() {
+        var grid = w2ui && w2ui.grid ? w2ui.grid : null;
+        if (!grid || grid._xqtToolbarLockPatched) {
+            return;
+        }
+
+        var originalLock = grid.lock.bind(grid);
+        var originalUnlock = grid.unlock.bind(grid);
+
+        grid.lock = function(message, showSpinner) {
+            originalLock(message, showSpinner);
+            SetToolbarLocked(true);
+        };
+
+        grid.unlock = function() {
+            originalUnlock();
+            SetToolbarLocked(false);
+        };
+
+        grid._xqtToolbarLockPatched = true;
+    }
+
+    function StripOrderPrefix(text) {
+        return String(text || "").replace(/^\d+\.\s*/, "");
+    }
+
+    function CompactToolbarText(text, maxLength) {
+        text = StripOrderPrefix(text);
+        maxLength = maxLength || 28;
+
+        if (text.length <= maxLength) {
+            return text;
+        }
+
+        return text.substring(0, maxLength - 1) + "...";
+    }
+
+    function GetEntityToolbarText(item, toolbar) {
+        var el = toolbar.get('entitySelect:' + item.selected);
+        if (!el) {
+            return "Entity";
+        }
+
+        if (item.selected === "none") {
+            return "None";
+        }
+
+        var match = String(el.text || "").match(/\(([^)]+)\)$/);
+        return CompactToolbarText(match ? match[1] : el.text, 26);
     }
 
     XrmTranslator.ComponentType = {
@@ -185,11 +292,11 @@
     };
 
     XrmTranslator.GetSolution = function() {
-        return w2ui.filterbar.get("solutionSelect").selected;
+        return GetToolbar().get("solutionSelect").selected;
     }
 
     XrmTranslator.GetEntity = function() {
-        return w2ui.filterbar.get("entitySelect").selected;
+        return GetToolbar().get("entitySelect").selected;
     }
 
     XrmTranslator.GetEntityId = function() {
@@ -197,11 +304,11 @@
     }
 
     XrmTranslator.GetType = function() {
-        return w2ui.filterbar.get("type").selected;
+        return GetToolbar().get("type").selected;
     }
 
     XrmTranslator.GetComponent = function() {
-        return w2ui.filterbar.get("component").selected;
+        return GetToolbar().get("component").selected;
     }
 
     function SetHandler() {
@@ -256,8 +363,7 @@
         }
 
         w2ui.grid.refresh();
-        w2ui.grid_toolbar.refresh();
-        w2ui.filterbar.refresh();
+        RefreshToolbar();
     }
 
     XrmTranslator.errorHandler = function(error) {
@@ -310,6 +416,7 @@
         if (grid) {
             grid.lock(message, true);
         }
+        SetToolbarLocked(true);
     };
 
     XrmTranslator.UnlockGrid = function () {
@@ -317,6 +424,7 @@
         if (grid) {
             grid.unlock();
         }
+        SetToolbarLocked(false);
     };
 
     XrmTranslator.SetUserLanguage = function (userId, language) {
@@ -909,17 +1017,18 @@
 
     function UpdateComponentDropdown(selectedType) {
         var hasDescription = typesWithDescription.indexOf(selectedType) !== -1;
-        var componentItem = w2ui.filterbar.get("component");
+        var toolbar = GetToolbar();
+        var componentItem = toolbar.get("component");
 
         if (hasDescription) {
-            w2ui['filterbar'].enable("component");
+            toolbar.enable("component");
         } else {
             if (componentItem) {
                 componentItem.selected = "DisplayName";
             }
-            w2ui['filterbar'].disable("component");
+            toolbar.disable("component");
         }
-        w2ui.filterbar.refresh();
+        RefreshToolbar();
     }
 
     function InitializeFindAndReplaceDialog() {
@@ -939,33 +1048,26 @@
                 name: 'findAndReplace',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 130px; white-space: nowrap;">Replace in Column: <span style="color: red;">*</span></label>'+
-                    '        <input name="column" type="list" style="flex: 1; width: 100%;"/>'+
+                    '<div class="w2ui-page page-0 xqt-find-replace-form">'+
+                    '    <div class="xqt-find-replace-field">'+
+                    '        <label>Replace in Column <span class="xqt-required">*</span></label>'+
+                    '        <input name="column" type="list"/>'+
                     '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 130px; white-space: nowrap;">Find: <span style="color: red;">*</span></label>'+
-                    '        <input name="find" type="text" style="flex: 1; width: 100%;"/>'+
+                    '    <div class="xqt-find-replace-field">'+
+                    '        <label>Find <span class="xqt-required">*</span></label>'+
+                    '        <input name="find" type="text"/>'+
                     '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 130px; white-space: nowrap;">Replace: <span style="color: red;">*</span></label>'+
-                    '        <input name="replace" type="text" style="flex: 1; width: 100%;"/>'+
+                    '    <div class="xqt-find-replace-field">'+
+                    '        <label>Replace <span class="xqt-required">*</span></label>'+
+                    '        <input name="replace" type="text"/>'+
                     '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 130px; white-space: nowrap;">Use Regex:</label>'+
-                    '        <input name="regex" type="checkbox"/>'+
-                    '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 130px; white-space: nowrap;">Ignore Case:</label>'+
-                    '        <input name="ignoreCase" type="checkbox"/>'+
-                    '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 130px; white-space: nowrap;">Select records:</label>'+
-                    '        <input name="selectRecords" type="checkbox"/>'+
+                    '    <div class="xqt-find-replace-options">'+
+                    '        <label><input name="regex" type="checkbox"/> Use Regex</label>'+
+                    '        <label><input name="ignoreCase" type="checkbox"/> Ignore Case</label>'+
+                    '        <label><input name="selectRecords" type="checkbox"/> Select Records</label>'+
                     '    </div>'+
                     '</div>'+
-                    '<div class="w2ui-buttons">'+
+                    '<div class="w2ui-buttons xqt-find-replace-buttons">'+
                     '    <button class="w2ui-btn" name="cancel">Cancel</button>'+
                     '    <button class="w2ui-btn" name="ok">Ok</button>'+
                     '</div>',
@@ -1015,11 +1117,11 @@
             w2popup.open({
                 title   : 'Find and Replace',
                 name    : 'findAndReplacePopup',
-                body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
-                style   : 'padding: 15px 0px 0px 0px',
-                width   : 650,
-                height  : 300,
-                showMax : true,
+                body    : '<div id="form" class="xqt-find-replace-popup-form"></div>',
+                style   : 'padding: 0',
+                width   : 720,
+                height  : 305,
+                showMax : false,
                 onToggle: function (event) {
                     w2ui.findAndReplace.box.style.display = 'none';
                     event.onComplete = function () {
@@ -1029,7 +1131,17 @@
                 },
                 onOpen: function (event) {
                     event.onComplete = function () {
+                        var popup = document.querySelector('#w2ui-popup');
+                        if (popup) {
+                            popup.classList.add('xqt-find-replace-popup');
+                        }
                         w2ui.findAndReplace.render('#w2ui-popup #form');
+                    }
+                },
+                onClose: function () {
+                    var popup = document.querySelector('#w2ui-popup');
+                    if (popup) {
+                        popup.classList.remove('xqt-find-replace-popup');
                     }
                 }
             });
@@ -1262,228 +1374,200 @@
         });
     }
 
+    function HandleToolbarClick(event) {
+        var target = String(event.target || "");
+
+        if (target === "about") {
+            ShowAbout();
+            return;
+        }
+
+        if (target === "help") {
+            ShowHelp();
+            return;
+        }
+
+        if (target.startsWith("solutionSelect:")) {
+            var selectedSolutionId = target.replace("solutionSelect:", "");
+            RepopulateEntitySelector(selectedSolutionId);
+            return;
+        }
+
+        if (target.startsWith("type:")) {
+            var selectedType = target.replace("type:", "");
+            UpdateComponentDropdown(selectedType);
+            return;
+        }
+
+        if (target.startsWith("entitySelect:")) {
+            if (target === "entitySelect:none") {
+                SetToolbarItemsVisible(ENTITY_DEPENDENT_TYPE_ITEMS, false);
+                SetToolbarItemsVisible(GLOBAL_TYPE_ITEMS, true);
+
+                if (["allInOne", "attributes", "options", "forms", "views", "formMeta", "entityMeta", "relationships", "charts", "bpf", "content"].indexOf(GetToolbar().get("type").selected) !== -1) {
+                    GetToolbar().get("type").selected = "sitemap";
+                    UpdateComponentDropdown("sitemap");
+                    RefreshToolbar();
+                }
+            }
+            else {
+                SetToolbarItemsVisible(ENTITY_DEPENDENT_TYPE_ITEMS, true);
+                SetToolbarItemsVisible(GLOBAL_TYPE_ITEMS, false);
+                SetToolbarItemsVisible(["type:content"], false);
+
+                if (target === "entitySelect:Adx_contentsnippet") {
+                    SetToolbarItemsVisible(["type:content"], true);
+                }
+
+                if (["content", "webresources", "dashboards", "sitemap", "globalOptionSets"].indexOf(GetToolbar().get("type").selected) !== -1) {
+                    GetToolbar().get("type").selected = "attributes";
+                    UpdateComponentDropdown("attributes");
+                    RefreshToolbar();
+                }
+            }
+
+            return;
+        }
+
+        if (target.indexOf("expandAll") !== -1) {
+            ToggleExpandCollapse(true);
+            return;
+        }
+
+        if (target.indexOf("collapseAll") !== -1) {
+            ToggleExpandCollapse(false);
+            return;
+        }
+
+        switch(target) {
+            case "aiTranslate:autoTranslate":
+                TranslationHandler.ShowTranslationPrompt();
+                break;
+            case "aiTranslate:aiSettings":
+                TranslationHandler.ShowAISettings();
+                break;
+        }
+    }
+
     function InitializeGrid (entities) {
-        var filterItems = [
-            { type: 'menu-radio', id: 'solutionSelect', icon: 'icon-folder',
+        var toolbarItems = [
+            { type: 'menu-radio', id: 'solutionSelect', icon: 'icon-solution',
+                tooltip: 'Solution',
                 text: function (item) {
                     var el = this.get('solutionSelect:' + item.selected);
                     if (el) {
-                        return 'Solution: ' + el.text;
+                        return CompactToolbarText(el.text, 24);
                     }
-                    return 'Choose solution';
+                    return 'Solution';
                 },
                 selected: 'all',
                 items: [
-                    { id: 'all', text: 'Default Solution' },
+                    { id: 'all', text: 'Default Solution', icon: 'icon-solution' },
                     { text: '--' }
                 ]
             },
-            { type: 'menu-radio', id: 'entitySelect', icon: 'icon-folder',
+            { type: 'menu-radio', id: 'entitySelect', icon: 'icon-entity',
+                tooltip: 'Entity',
                 text: function (item) {
-                    var text = item.selected;
-                    var el = this.get('entitySelect:' + item.selected);
-
-                    if (el) {
-                        return 'Entity: ' + el.text;
-                    }
-                    else {
-                        return "Choose entity";
-                    }
+                    return GetEntityToolbarText(item, this);
                 },
                 selected: "none",
                 items: [
-                    { id: 'none', text: 'None' },
+                    { id: 'none', text: 'None', icon: 'icon-empty' },
                     { text: '--' }
                 ]
             },
-            { type: 'menu-radio', id: 'type', icon: 'icon-folder',
+            { type: 'menu-radio', id: 'type', icon: 'icon-type',
+                tooltip: 'Translation type',
                 text: function (item) {
-                    var text = item.selected;
                     var el   = this.get('type:' + item.selected);
-                    return 'Type: ' + el.text;
+                    return el ? CompactToolbarText(el.text, 18) : 'Type';
                 },
                 selected: 'sitemap',
                 items: (XrmTranslator.showAllInOneType ? [
-                    { id: 'allInOne', text: 'All-In-One', icon: 'fa-camera' },
+                    { id: 'allInOne', text: 'All-In-One', icon: 'icon-grid' },
                     { id: 'entitySeparator', text: '--' }
                 ] : []).concat([
-                    { id: 'attributes', text: '1. Attributes', icon: 'fa-camera' },
-                    { id: 'options', text: '2. Option Sets', icon: 'fa-picture' },
-                    { id: 'forms', text: '3. Forms', icon: 'fa-picture' },
-                    { id: 'views', text: '4. Views', icon: 'fa-picture' },
-                    { id: 'formMeta', text: '5. Form Metadata', icon: 'fa-picture' },
-                    { id: 'entityMeta', text: '6. Entity Metadata', icon: 'fa-picture' },
-                    { id: 'relationships', text: '7. Relationships', icon: 'fa-picture' },
-                    { id: 'charts', text: '8. Charts', icon: 'fa-picture' },
-                    { id: 'bpf', text: '9. Business Process Flows', icon: 'fa-picture' },
-                    { id: 'sitemap', text: '1. Sitemap', icon: 'fa-picture' },
-                    { id: 'content', text: 'Content', icon: 'fa-picture' },
-                    { id: 'dashboards', text: '2. Dashboards', icon: 'fa-picture' },
-                    { id: 'webresources', text: '3. Web Resources', icon: 'fa-picture' },
-                    { id: 'globalOptionSets', text: '4. Global Option Sets', icon: 'fa-picture' }
+                    { id: 'attributes', text: '1. Attributes', icon: 'icon-attribute' },
+                    { id: 'options', text: '2. Option Sets', icon: 'icon-options' },
+                    { id: 'forms', text: '3. Forms', icon: 'icon-form' },
+                    { id: 'views', text: '4. Views', icon: 'icon-view' },
+                    { id: 'formMeta', text: '5. Form Metadata', icon: 'icon-layout' },
+                    { id: 'entityMeta', text: '6. Entity Metadata', icon: 'icon-entity' },
+                    { id: 'relationships', text: '7. Relationships', icon: 'icon-link' },
+                    { id: 'charts', text: '8. Charts', icon: 'icon-chart' },
+                    { id: 'bpf', text: '9. Business Process Flows', icon: 'icon-flow' },
+                    { id: 'sitemap', text: '1. Sitemap', icon: 'icon-sitemap' },
+                    { id: 'content', text: 'Content', icon: 'icon-code' },
+                    { id: 'dashboards', text: '2. Dashboards', icon: 'icon-dashboard' },
+                    { id: 'webresources', text: '3. Web Resources', icon: 'icon-file-code' },
+                    { id: 'globalOptionSets', text: '4. Global Option Sets', icon: 'icon-global-options' }
                 ])
             },
-            { type: 'menu-radio', id: 'component', icon: 'icon-folder',
+            { type: 'menu-radio', id: 'component', icon: 'icon-component',
+                tooltip: 'Component',
                 text: function (item) {
-                    var text = item.selected;
                     var el   = this.get('component:' + item.selected);
-                    return 'Component: ' + el.text;
+                    return el ? CompactToolbarText(el.text, 18) : 'Component';
                 },
                 selected: 'DisplayName',
                 items: [
-                    { id: 'DisplayName', text: 'DisplayName', icon: 'fa-picture' },
-                    { id: 'Description', text: 'Description', icon: 'fa-picture' }
+                    { id: 'DisplayName', text: 'DisplayName', icon: 'icon-label' },
+                    { id: 'Description', text: 'Description', icon: 'icon-description' }
                 ]
             },
             { type: 'break' },
-            { type: 'button', id: 'load', text: 'Load', icon:'w2ui-icon-reload', onClick: LoadHandler },
-            { type: 'spacer' },
-            { type: 'break' },
-            { type: 'button', id: 'about', text: 'About', icon: 'icon-about' },
-            { type: 'button', id: 'help', text: 'Help', icon:'w2ui-icon-info' }
+            { type: 'button', id: 'load', text: 'Load', tooltip: 'Load selected data', icon:'icon-load', onClick: LoadHandler },
+            { type: 'break', id: 'break-context' }
         ];
 
-        new w2toolbar({
-            name: 'filterbar',
-            items: filterItems,
-            onClick: function (event) {
-                var target = event.target;
-
-                if (target === "about") {
-                    ShowAbout();
-                    return;
-                }
-
-                if (target === "help") {
-                    ShowHelp();
-                    return;
-                }
-
-                if (target.startsWith("solutionSelect:")) {
-                    var selectedSolutionId = target.replace("solutionSelect:", "");
-                    RepopulateEntitySelector(selectedSolutionId);
-                }
-
-                if (target.startsWith("type:")) {
-                    var selectedType = target.replace("type:", "");
-                    UpdateComponentDropdown(selectedType);
-                }
-
-                if (target.startsWith("entitySelect:")) {
-                    if (target === "entitySelect:none") {
-                        w2ui['filterbar'].hide('type:allInOne');
-                        w2ui['filterbar'].hide('type:entitySeparator');
-                        w2ui['filterbar'].hide('type:attributes');
-                        w2ui['filterbar'].hide('type:options');
-                        w2ui['filterbar'].hide('type:views');
-                        w2ui['filterbar'].hide('type:entityMeta');
-                        w2ui['filterbar'].hide('type:relationships');
-                        w2ui['filterbar'].hide('type:charts');
-                        w2ui['filterbar'].hide('type:content');
-                        w2ui['filterbar'].hide('type:forms');
-                        w2ui['filterbar'].hide('type:formMeta');
-                        w2ui['filterbar'].hide('type:bpf');
-
-                        w2ui['filterbar'].show('type:webresources');
-                        w2ui['filterbar'].show('type:dashboards');
-                        w2ui['filterbar'].show('type:sitemap');
-                        w2ui['filterbar'].show('type:globalOptionSets');
-
-                        if (["allInOne", "attributes", "options", "forms", "views", "formMeta", "entityMeta", "relationships", "charts", "bpf", "content"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
-                            w2ui.filterbar.get("type").selected = "sitemap";
-                            UpdateComponentDropdown("sitemap");
-                            w2ui.filterbar.refresh();
-                        }
-                    }
-                    else {
-                        w2ui['filterbar'].show('type:allInOne');
-                        w2ui['filterbar'].show('type:entitySeparator');
-                        w2ui['filterbar'].show('type:attributes');
-                        w2ui['filterbar'].show('type:options');
-                        w2ui['filterbar'].show('type:views');
-                        w2ui['filterbar'].show('type:entityMeta');
-                        w2ui['filterbar'].show('type:relationships');
-                        w2ui['filterbar'].show('type:charts');
-                        w2ui['filterbar'].show('type:forms');
-                        w2ui['filterbar'].show('type:formMeta');
-                        w2ui['filterbar'].show('type:bpf');
-
-                        w2ui['filterbar'].hide('type:webresources');
-                        w2ui['filterbar'].hide('type:dashboards');
-                        w2ui['filterbar'].hide('type:sitemap');
-                        w2ui['filterbar'].hide('type:globalOptionSets');
-                        w2ui['filterbar'].hide('type:content');
-
-                        if (target === "entitySelect:Adx_contentsnippet") {
-                            w2ui['filterbar'].show('type:content');
-                        }
-
-                        if (["content", "webresources", "dashboards", "sitemap", "globalOptionSets"].indexOf(w2ui.filterbar.get("type").selected) !== -1) {
-                            w2ui.filterbar.get("type").selected = "attributes";
-                            UpdateComponentDropdown("attributes");
-                            w2ui.filterbar.refresh();
-                        }
-                    }
-                }
-            }
-        }).render('#filterbar');
-
-        // Hide entity-dependent items on initial load (entity defaults to None)
-        w2ui['filterbar'].hide('type:allInOne');
-        w2ui['filterbar'].hide('type:entitySeparator');
-        w2ui['filterbar'].hide('type:attributes');
-        w2ui['filterbar'].hide('type:options');
-        w2ui['filterbar'].hide('type:forms');
-        w2ui['filterbar'].hide('type:views');
-        w2ui['filterbar'].hide('type:formMeta');
-        w2ui['filterbar'].hide('type:entityMeta');
-        w2ui['filterbar'].hide('type:relationships');
-        w2ui['filterbar'].hide('type:charts');
-        w2ui['filterbar'].hide('type:content');
-        w2ui['filterbar'].hide('type:bpf');
-
-        var items = [
-            { type: 'button', hidden: true, id: 'removeOverriddenAttributeLabels', text: 'Remove Overridden Attribute Labels', icon:'w2ui-icon-cross', onClick: function(event) {
+        toolbarItems.push(
+            { type: 'button', hidden: true, id: 'removeOverriddenAttributeLabels', text: '', tooltip: 'Remove overridden attribute labels', icon:'icon-eraser', onClick: function(event) {
                 FormHandler.RemoveOverriddenCellLabels();
             }}
-        ];
+        );
 
         var aiTranslateMenuItems = [];
 
         if (!XrmTranslator.config.hideAutoTranslate) {
-            aiTranslateMenuItems.push({ id: 'autoTranslate', text: 'Auto Translate', icon: 'icon-page' });
+            aiTranslateMenuItems.push({ id: 'autoTranslate', text: 'Auto Translate', icon: 'icon-translate' });
         }
 
-        aiTranslateMenuItems.push({ id: 'aiSettings', text: 'AI Settings', icon: 'icon-page' });
+        aiTranslateMenuItems.push({ id: 'aiSettings', text: 'AI Settings', icon: 'w2ui-icon-settings' });
 
-        items.push({ type: 'menu', id: 'aiTranslate', text: 'AI Translate', icon: 'icon-page',
+        toolbarItems.push({ type: 'menu', id: 'aiTranslate', text: '', tooltip: 'AI translate', icon: 'icon-sparkles',
             items: aiTranslateMenuItems
         });
 
-        items.push({ type: 'break' });
+        toolbarItems.push({ type: 'break' });
 
-        items.push({ type: 'button', id: 'applyDictionary', text: 'Apply Dictionary', icon: 'icon-page', onClick: function () {
+        toolbarItems.push({ type: 'button', id: 'applyDictionary', text: '', tooltip: 'Apply dictionary', icon: 'icon-book-check', onClick: function () {
             TranslationHandler.ShowApplyDictionaryPrompt();
         } });
 
-        items.push({ type: 'button', id: 'dictionary', text: 'Dictionary', icon: 'icon-page', onClick: function () {
+        toolbarItems.push({ type: 'button', id: 'dictionary', text: '', tooltip: 'Manage dictionary', icon: 'icon-book', onClick: function () {
             if (window.TranslationDictionaryService && TranslationDictionaryService.ShowDictionaryPrompt) {
                 TranslationDictionaryService.ShowDictionaryPrompt();
             }
         } });
 
-        items.push({ type: 'break', id: 'break-filter' });
-        items.push({ type: 'check', id: 'filterUntranslated', icon: 'icon-funnel', tooltip: 'Show only untranslated records', onClick: function () {
+        toolbarItems.push({ type: 'break', id: 'break-filter' });
+        toolbarItems.push({ type: 'check', id: 'filterUntranslated', icon: 'icon-funnel', tooltip: 'Show only untranslated records', onClick: function () {
             ToggleUntranslatedFilter();
         } });
 
-        items.push({ type: 'spacer' });
+        toolbarItems.push({ type: 'spacer' });
 
         if (XrmTranslator.showDebugButton) {
-            items.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', icon: 'icon-page', onClick: function () {
+            toolbarItems.push({ type: 'button', id: 'debugAutofill', text: '', tooltip: 'Apply debug translations', icon: 'icon-debug', onClick: function () {
                 TranslationHandler.ApplyDebugTranslations();
             } });
         }
+
+        toolbarItems.push(
+            { type: 'button', id: 'about', text: '', tooltip: 'About', icon: 'icon-about' },
+            { type: 'button', id: 'help', text: '', tooltip: 'Help', icon:'icon-help' }
+        );
 
         new w2grid({
             name: 'grid',
@@ -1492,7 +1576,8 @@
                 toolbar: true,
                 footer: true,
                 toolbarSave: true,
-                toolbarSearch: true
+                toolbarSearch: true,
+                toolbarReload: false
             },
             multiSearch: true,
             searches: [
@@ -1505,42 +1590,26 @@
                 currentHandler.Save();
             },
             toolbar: {
-                items: items,
-                onClick: function (event) {
-                    var target = event.target;
-
-                    if (target.indexOf("expandAll") !== -1) {
-                        ToggleExpandCollapse(true);
-                    } else if (target.indexOf("collapseAll") !== -1) {
-                        ToggleExpandCollapse(false);
-                    }
-
-                    switch(event.target) {
-                        case "aiTranslate:autoTranslate":
-                            TranslationHandler.ShowTranslationPrompt();
-                            break;
-                        case "aiTranslate:aiSettings":
-                            TranslationHandler.ShowAISettings();
-                            break;
-                    }
-                }
+                items: toolbarItems,
+                onClick: HandleToolbarClick
             }
         }).render();
 
-        // Insert items before built-in grid toolbar items
         var gridToolbar = w2ui['grid_toolbar'];
 
-        gridToolbar.insert('w2ui-reload', { type: 'menu', id: 'toggle', icon: 'icon-folder',
-            text: "Toggle",
+        // Hide entity-dependent items on initial load (entity defaults to None)
+        SetToolbarItemsVisible(ENTITY_DEPENDENT_TYPE_ITEMS, false);
+
+        gridToolbar.insert('w2ui-search-advanced', { type: 'menu', id: 'toggle', text: '', tooltip: 'Expand/collapse rows', icon: 'icon-tree',
             items: [
                 { type: 'button', text: 'Expand all records', id: 'expandAll', icon: 'w2ui-icon-expand' },
                 { type: 'button', text: 'Collapse all records', id: 'collapseAll', icon: 'w2ui-icon-collapse' }
             ]
         });
-        gridToolbar.insert('w2ui-reload', { type: 'break', id: 'break-toggle' });
+        gridToolbar.insert('w2ui-search-advanced', { type: 'break', id: 'break-toggle' });
 
         if (!XrmTranslator.config.hideFindAndReplace) {
-            gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: 'Find and Replace', icon: 'icon-page', id: 'findReplace', onClick: function (event) {
+            gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: '', tooltip: 'Find and replace', icon: 'icon-find-replace', id: 'findReplace', onClick: function (event) {
                 OpenFindAndReplaceDialog();
             } });
         }
@@ -1548,33 +1617,13 @@
         // Move Save button to the far right (after DEBUG)
         var saveBtn = gridToolbar.get('w2ui-save');
         if (saveBtn) {
+            saveBtn.text = 'Save';
+            saveBtn.tooltip = 'Save changes';
             gridToolbar.remove('w2ui-save');
             gridToolbar.add(saveBtn);
         }
 
-        // Patch grid.lock/unlock to also cover the filterbar (toolbar1).
-        // This way ANY call to grid.unlock() from any handler automatically unlocks both.
-        var _grid = w2ui.grid;
-        var _origLock = _grid.lock.bind(_grid);
-        var _origUnlock = _grid.unlock.bind(_grid);
-        var _filterbar = document.getElementById("filterbar");
-
-        // Create an overlay div matching w2ui's .w2ui-lock style
-        var _filterbarLock = document.createElement('div');
-        _filterbarLock.style.cssText = "display:none;position:absolute;z-index:10;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,0.1);pointer-events:auto;";
-        _filterbar.style.position = "relative";
-        _filterbar.appendChild(_filterbarLock);
-
-        _grid.lock = function(msg, showSpinner) {
-            _origLock(msg, showSpinner);
-            _filterbarLock.style.display = '';
-        };
-
-        _grid.unlock = function() {
-            _origUnlock();
-            _filterbarLock.style.display = 'none';
-        };
-
+        PatchGridToolbarLock();
         XrmTranslator.LockGrid("Loading entities");
     }
 
@@ -1584,13 +1633,13 @@
         }
 
         entities = entities.sort(XrmTranslator.EntityComparer);
-        var entitySelect = w2ui.filterbar.get("entitySelect").items;
+        var entitySelect = GetToolbar().get("entitySelect").items;
 
         for (var i = 0; i < entities.length; i++) {
             var entity = entities[i];
 
             var localizedLabel = entity.DisplayName.UserLocalizedLabel || {};
-            entitySelect.push({id: entity.SchemaName, text: localizedLabel.Label ? `${localizedLabel.Label} (${entity.LogicalName})` : entity.LogicalName });
+            entitySelect.push({id: entity.SchemaName, text: localizedLabel.Label ? `${localizedLabel.Label} (${entity.LogicalName})` : entity.LogicalName, icon: 'icon-entity' });
             XrmTranslator.entityMetadata[entity.SchemaName] = entity.MetadataId;
         }
 
@@ -1616,13 +1665,14 @@
     }
 
     function FillSolutionSelector(solutions) {
-        var solutionSelect = w2ui.filterbar.get("solutionSelect").items;
+        var solutionSelect = GetToolbar().get("solutionSelect").items;
 
         for (var i = 0; i < solutions.length; i++) {
             var solution = solutions[i];
             solutionSelect.push({
                 id: solution.solutionid,
-                text: solution.friendlyname + " (" + solution.uniquename + ")"
+                text: solution.friendlyname + " (" + solution.uniquename + ")",
+                icon: 'icon-solution'
             });
         }
 
@@ -1648,17 +1698,17 @@
     }
 
     function RepopulateEntitySelector(solutionId) {
-        var entitySelectItem = w2ui.filterbar.get("entitySelect");
+        var entitySelectItem = GetToolbar().get("entitySelect");
         entitySelectItem.selected = "none";
         entitySelectItem.items = [
-            { id: 'none', text: 'None' },
+            { id: 'none', text: 'None', icon: 'icon-empty' },
             { text: '--' }
         ];
         XrmTranslator.entityMetadata = {};
 
         if (!solutionId || solutionId === 'all') {
             FillEntitySelector(XrmTranslator.allEntities);
-            w2ui.filterbar.refresh();
+            RefreshToolbar();
             return Promise.resolve();
         }
 
@@ -1670,7 +1720,7 @@
                 return metadataIds.indexOf(e.MetadataId.toLowerCase()) !== -1;
             });
             FillEntitySelector(solutionEntities);
-            w2ui.filterbar.refresh();
+            RefreshToolbar();
             XrmTranslator.UnlockGrid();
         })
         .catch(function(error) {
