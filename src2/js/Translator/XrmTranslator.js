@@ -40,8 +40,6 @@
     XrmTranslator.installedLanguages = null;
     XrmTranslator.baseLanguage = null;
 
-    XrmTranslator.config = null;
-
     XrmTranslator.columnRestoreNeeded = false;
 
     XrmTranslator.defaultSchemaNameSize = "20%";
@@ -90,24 +88,6 @@
         "type:sitemap",
         "type:globalOptionSets"
     ];
-    var CONFIG_WEBRESOURCE_NAMES = [
-        "pl_/XrmQuickTranslate/config/XrmQuickTranslateConfig.js"
-    ];
-    var DEFAULT_CONFIG = {
-        entityWhitelist: [],
-        entityWhiteList: [],
-        enableOpenAI: false,
-        hideAutoTranslate: false,
-        hideFindAndReplace: false,
-        hideLanguagesByDefault: false,
-        lockedLanguages: [],
-        lockFormCells: false,
-        solutionUniqueName: null,
-        translationExceptions: []
-    };
-
-
-
     RegExp.escape= function(s) {
         return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     };
@@ -669,31 +649,7 @@
     }
 
     XrmTranslator.AddToSolution = function(componentIds, componentType, includeComponentSettings, includeSubComponents) {
-        if (!XrmTranslator.config.solutionUniqueName) {
-            return Promise.resolve(null);
-        }
-
-        XrmTranslator.LockGrid("Adding components to solution");
-
-        var addIndex = 0;
-
-        return WebApiClient.Promise.resolve(componentIds)
-        .each(function(c) {
-            XrmTranslator.LockGridProgress("Adding components to solution", ++addIndex, componentIds.length);
-            var request = WebApiClient.Requests.AddSolutionComponentRequest.with({
-                payload: {
-                    ComponentId: c,
-                    ComponentType: componentType, // Gather this from CRM SDK in SampleCode/CS/HelperCode/OptionSets.cs, named ComponentType
-                    SolutionUniqueName: XrmTranslator.config.solutionUniqueName,
-                    AddRequiredComponents: false,
-                    IncludedComponentSettingsValues: includeComponentSettings ? null : [],
-                    DoNotIncludeSubcomponents: includeSubComponents ? false : true
-                }
-            });
-
-            return WebApiClient.Execute(request);
-        })
-        .catch(XrmTranslator.errorHandler);
+        return Promise.resolve(null);
     }
 
     XrmTranslator.BatchSaveSize = 25;
@@ -997,6 +953,43 @@
         return r;
     }
 
+    function hasRecordSelectorText(value) {
+        if (value === null || typeof value === "undefined") {
+            return false;
+        }
+
+        return String(value)
+            .replace(/&nbsp;/gi, " ")
+            .replace(/\u00a0/g, " ")
+            .replace(/<[^>]*>/g, "")
+            .trim()
+            .length > 0;
+    }
+
+    function getRecordSelectorValue(record, lang) {
+        if (!record) {
+            return "";
+        }
+
+        if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, lang)) {
+            return record.w2ui.changes[lang];
+        }
+
+        if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, String(lang))) {
+            return record.w2ui.changes[String(lang)];
+        }
+
+        if (Object.prototype.hasOwnProperty.call(record, lang)) {
+            return record[lang];
+        }
+
+        if (Object.prototype.hasOwnProperty.call(record, String(lang))) {
+            return record[String(lang)];
+        }
+
+        return "";
+    }
+
     function ResolveRecordSelectorCallback(callbackName) {
         var parts = String(callbackName || "").split(".");
         var context = window;
@@ -1077,12 +1070,14 @@
 
         w2ui.recordSelectorGrid.reset(true);
         w2ui.recordSelectorGrid.clear();
-        var allRecords = JSON.parse(JSON.stringify(XrmTranslator.GetGrid().records)).map(removeHideCheckBoxFlag);
+        var selectorSourceRecords = unfilteredRecords || XrmTranslator.GetGrid().records;
+        var allRecords = JSON.parse(JSON.stringify(selectorSourceRecords)).map(removeHideCheckBoxFlag);
 
         var sourceLang = options.sourceLcid ? String(options.sourceLcid) : (XrmTranslator.baseLanguage ? XrmTranslator.baseLanguage.toString() : null);
         if (sourceLang) {
             var setSourceTextRecursive = function(record, lang) {
-                record.sourceText = record[lang] || record[String(lang)] || '';
+                record.sourceText = getRecordSelectorValue(record, lang);
+
                 if (record.w2ui && Array.isArray(record.w2ui.children)) {
                     record.w2ui.children.forEach(function(child) {
                         setSourceTextRecursive(child, lang);
@@ -1105,7 +1100,7 @@
                         if (r.w2ui.children.length > 0) return true;
                     }
 
-                    if (options.excludeEmptySource && (!r.sourceText || String(r.sourceText).trim() === "")) {
+                    if (options.excludeEmptySource && !hasRecordSelectorText(r.sourceText)) {
                         return false;
                     }
 
@@ -1122,7 +1117,7 @@
         }
 
         if (recordFilter && filteredRecords.length === 0) {
-            w2alert("No matching records found. All records already have translations for the target language.");
+            w2alert(options.emptyMessage || "No matching records found. All records already have translations for the target language.");
             return;
         }
 
@@ -1512,7 +1507,7 @@
 
         if (XrmTranslator.columnRestoreNeeded) {
             XrmTranslator.ClearColumns();
-            promise = TranslationHandler.FillLanguageCodes(XrmTranslator.installedLanguages.LocaleIds, XrmTranslator.userSettings, XrmTranslator.config);
+            promise = TranslationHandler.FillLanguageCodes(XrmTranslator.installedLanguages.LocaleIds, XrmTranslator.userSettings);
         }
         else {
             promise = Promise.resolve(null);
@@ -1688,9 +1683,7 @@
 
         var aiTranslateMenuItems = [];
 
-        if (!XrmTranslator.config.hideAutoTranslate) {
-            aiTranslateMenuItems.push({ id: 'autoTranslate', text: 'Auto Translate', icon: 'icon-translate' });
-        }
+        aiTranslateMenuItems.push({ id: 'autoTranslate', text: 'Auto Translate', icon: 'icon-translate' });
 
         aiTranslateMenuItems.push({ id: 'aiSettings', text: 'AI Settings', icon: 'w2ui-icon-settings' });
 
@@ -1773,11 +1766,9 @@
         });
         gridToolbar.insert('w2ui-search-advanced', { type: 'break', id: 'break-toggle' });
 
-        if (!XrmTranslator.config.hideFindAndReplace) {
-            gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: '', tooltip: 'Find and replace', icon: 'icon-find-replace', id: 'findReplace', onClick: function (event) {
-                OpenFindAndReplaceDialog();
-            } });
-        }
+        gridToolbar.insert('w2ui-search-advanced', { type: 'button', text: '', tooltip: 'Find and replace', icon: 'icon-find-replace', id: 'findReplace', onClick: function (event) {
+            OpenFindAndReplaceDialog();
+        } });
 
         // Move Save button to the far right (after DEBUG)
         var saveBtn = gridToolbar.get('w2ui-save');
@@ -1794,10 +1785,6 @@
     }
 
     function FillEntitySelector (entities) {
-        if (XrmTranslator.config.entityWhitelist && XrmTranslator.config.entityWhitelist.length) {
-            entities = entities.filter(function (e) { return XrmTranslator.config.entityWhitelist.indexOf(e.LogicalName) !== -1 });
-        }
-
         entities = entities.sort(XrmTranslator.EntityComparer);
         var entitySelect = GetToolbar().get("entitySelect").items;
 
@@ -2001,73 +1988,8 @@
         records.push(summary);
     };
 
-    function EscapeODataString(value) {
-        return String(value || "").replace(/'/g, "''");
-    }
-
-    function CloneDefaultConfig() {
-        return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-    }
-
-    function NormalizeConfig(config) {
-        var normalized = CloneDefaultConfig();
-
-        if (config && typeof config === "object") {
-            Object.keys(config).forEach(function (key) {
-                normalized[key] = config[key];
-            });
-        }
-
-        if (!normalized.entityWhitelist.length && normalized.entityWhiteList.length) {
-            normalized.entityWhitelist = normalized.entityWhiteList;
-        }
-
-        return normalized;
-    }
-
-    function DecodeConfigContent(content) {
-        if (!content) {
-            return {};
-        }
-
-        return JSON.parse(atob(content));
-    }
-
-    function FindConfigWebResource(configNames) {
-        var names = configNames.slice(0);
-
-        function next() {
-            var configName = names.shift();
-
-            if (!configName) {
-                return Promise.resolve(null);
-            }
-
-            return WebApiClient.Retrieve({
-                overriddenSetName: "webresourceset",
-                queryParams: "?$select=webresourceid,name,content&$filter=name eq '" + EscapeODataString(configName) + "'"
-            })
-            .then(function (result) {
-                var records = result && result.value ? result.value : [];
-                return records.length ? records[0] : next();
-            });
-        }
-
-        return next();
-    }
-
-    function FetchConfig() {
-        return FindConfigWebResource(CONFIG_WEBRESOURCE_NAMES)
-        .then(function (webResource) {
-            XrmTranslator.config = NormalizeConfig(webResource ? DecodeConfigContent(webResource.content) : null);
-        });
-    }
-
     XrmTranslator.Initialize = function() {
-        FetchConfig()
-        .then(function() {
-            return XrmTranslator.GetBaseLanguage();
-        })
+        XrmTranslator.GetBaseLanguage()
         .then(function() {
             InitializeGrid();
             RegisterReloadPrevention();
@@ -2098,7 +2020,7 @@
         })
         .then(function(languages) {
             XrmTranslator.installedLanguages = languages;
-            return TranslationHandler.FillLanguageCodes(languages.LocaleIds, XrmTranslator.userSettings, XrmTranslator.config);
+            return TranslationHandler.FillLanguageCodes(languages.LocaleIds, XrmTranslator.userSettings);
         })
         .then(function () {
             if (window.TranslationDictionaryService && TranslationDictionaryService.EnsureInitialized) {

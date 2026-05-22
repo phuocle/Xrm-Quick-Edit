@@ -43,6 +43,19 @@
         return record[lcid] || record[String(lcid)] || "";
     }
 
+    function HasTranslationText(value) {
+        if (value === null || typeof value === "undefined") {
+            return false;
+        }
+
+        return String(value)
+            .replace(/&nbsp;/gi, " ")
+            .replace(/\u00a0/g, " ")
+            .replace(/<[^>]*>/g, "")
+            .trim()
+            .length > 0;
+    }
+
     function GetSavedTranslationPrompt() {
         try {
             var stored = localStorage.getItem(TRANSLATION_PROMPT_KEY);
@@ -104,9 +117,7 @@
     }
 
     function IsOpenAIEnabled() {
-        return typeof XrmTranslator !== "undefined" &&
-            XrmTranslator.config &&
-            normalizeBoolean(XrmTranslator.config.enableOpenAI, false);
+        return false;
     }
 
     function IsProviderEnabled(provider) {
@@ -701,11 +712,11 @@
             var targetVal = GetCurrentGridValue(record, destLcid);
 
             if (mode === "missing") {
-                return !targetVal;
+                return !HasTranslationText(targetVal);
             }
 
             if (mode === "missingOrIdentical") {
-                return !targetVal || sourceVal === targetVal;
+                return !HasTranslationText(targetVal) || sourceVal === targetVal;
             }
 
             if (mode === "overwrite") {
@@ -713,7 +724,7 @@
             }
 
             // Backward compatibility with previously saved empty mode.
-            return !targetVal;
+            return !HasTranslationText(targetVal);
         }
 
         var mode = (translateMissing || "missing").trim();
@@ -737,7 +748,7 @@
             var translator = result[0];
 
             if (!translator) {
-                var errorMsg = result[1] || "(No error message returned - check config)";
+                var errorMsg = result[1] || "(No error message returned - check API response)";
                 XrmTranslator.UnlockGrid();
                 w2alert(errorMsg);
                 return null;
@@ -750,7 +761,7 @@
 
                 // Skip records that have no source text
                 var sourceText = GetCurrentGridValue(record, fromLcid);
-                if (!sourceText) {
+                if (!HasTranslationText(sourceText)) {
                     continue;
                 }
 
@@ -801,13 +812,7 @@
                 for (var i = 0; i < recordsForAi.length; i++) {
                     var record = recordsForAi[i];
 
-                    const source = XrmTranslator.config.translationExceptions && XrmTranslator.config.translationExceptions.length
-                    ? XrmTranslator.config.translationExceptions.reduce(function(all, cur) {
-                        return (all || "").replace(new RegExp(cur, "gmi"), '<escape data="$1"/>')
-                    }, GetCurrentGridValue(record, fromLcid))
-                    : GetCurrentGridValue(record, fromLcid)
-
-                    translationRequests.push(translator.GetTranslation(fromIso, toIso, w2utils.decodeTags(source)));
+                    translationRequests.push(translator.GetTranslation(fromIso, toIso, w2utils.decodeTags(GetCurrentGridValue(record, fromLcid))));
                 }
 
                 return WebApiClient.Promise.all(translationRequests)
@@ -877,25 +882,25 @@
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
                     '<div class="w2ui-page page-0 xqt-translation-prompt-form">'+
-                    '    <div class="w2ui-field xqt-translation-prompt-field">'+
-                    '        <label>Source Lcid: <span style="color: red;">*</span></label>'+
-                    '        <div><input name="sourceLcid" type="list" /></div>'+
+                    '    <div class="xqt-translation-prompt-row">'+
+                    '        <label class="xqt-translation-prompt-label" for="sourceLcid">Source Lcid: <span class="xqt-required">*</span></label>'+
+                    '        <div class="xqt-translation-prompt-control"><input name="sourceLcid" type="list" /></div>'+
                     '    </div>'+
-                    '    <div class="w2ui-field xqt-translation-prompt-field">'+
-                    '        <label>Target Lcid: <span style="color: red;">*</span></label>'+
-                    '        <div><input name="targetLcid" type="list" /></div>'+
+                    '    <div class="xqt-translation-prompt-row">'+
+                    '        <label class="xqt-translation-prompt-label" for="targetLcid">Target Lcid: <span class="xqt-required">*</span></label>'+
+                    '        <div class="xqt-translation-prompt-control"><input name="targetLcid" type="list" /></div>'+
                     '    </div>'+
-                    '    <div class="w2ui-field xqt-translation-prompt-field">'+
-                    '        <label>Translate All:</label>'+
-                    '        <div><input name="translateMissing" type="list" /></div>'+
+                    '    <div class="xqt-translation-prompt-row">'+
+                    '        <label class="xqt-translation-prompt-label" for="translateMissing">Translate All:</label>'+
+                    '        <div class="xqt-translation-prompt-control"><input name="translateMissing" type="list" /></div>'+
                     '    </div>'+
-                    '    <div class="w2ui-field xqt-translation-prompt-field">'+
-                    '        <label>API Provider:</label>'+
-                    '        <div><input name="apiProvider" type="list" /></div>'+
+                    '    <div class="xqt-translation-prompt-row">'+
+                    '        <label class="xqt-translation-prompt-label" for="apiProvider">API Provider:</label>'+
+                    '        <div class="xqt-translation-prompt-control"><input name="apiProvider" type="list" /></div>'+
                     '    </div>'+
-                    '    <div class="w2ui-field xqt-translation-prompt-field xqt-translation-prompt-check">'+
-                    '        <label>Use Dictionary as First Priority:</label>'+
-                    '        <div><input name="useDictionaryFirst" type="checkbox" /></div>'+
+                    '    <div class="xqt-translation-prompt-row xqt-translation-prompt-check">'+
+                    '        <label class="xqt-translation-prompt-label" for="useDictionaryFirst">Use Dictionary as First Priority:</label>'+
+                    '        <div class="xqt-translation-prompt-control"><input name="useDictionaryFirst" type="checkbox" /></div>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -940,11 +945,11 @@
                                 }
 
                                 if (translateMissingVal === "missingOrIdentical") {
-                                    return !targetVal || sourceVal === targetVal;
+                                    return !HasTranslationText(targetVal) || sourceVal === targetVal;
                                 }
 
                                 // "missing" - only records without target translation
-                                return !targetVal;
+                                return !HasTranslationText(targetVal);
                             };
                         }
 
@@ -953,7 +958,13 @@
                             [sourceLcid, targetLcid, translateMissingVal, apiProviderVal, useDictionaryFirstVal],
                             (XrmTranslator.GetGrid().getSelection() || []),
                             recordFilter,
-                            { sourceLcid: sourceLcid, excludeEmptySource: true }
+                            {
+                                sourceLcid: sourceLcid,
+                                excludeEmptySource: true,
+                                emptyMessage: translateMissingVal === "overwrite"
+                                    ? "No records with source text found for the selected source language."
+                                    : "No matching records found. All records already have translations for the target language."
+                            }
                         );
                     },
                     "cancel": function () {
@@ -965,6 +976,8 @@
         else {
             w2ui.translationPrompt.fields[0].options.items = languageItems;
             w2ui.translationPrompt.fields[1].options.items = languageItems;
+            w2ui.translationPrompt.fields[2].options.items = translateMissingItems;
+            w2ui.translationPrompt.fields[3].options.items = apiProviderItems;
 
             if (saved) {
                 w2ui.translationPrompt.record = savedRecord;
@@ -982,8 +995,8 @@
             w2popup.open({
                 title   : 'Choose translations source and destination',
                 name    : 'translationPopup',
-                body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
-                style   : 'padding: 15px 0px 0px 0px',
+                body    : '<div id="form" class="xqt-translation-prompt-popup-form"></div>',
+                style   : 'padding: 0px; overflow-x: hidden;',
                 width   : 650,
                 height  : 360,
                 showMax : false,
@@ -1341,7 +1354,7 @@
         return languageName + localeCode + " (" + language + ")";
     }
 
-    TranslationHandler.FillLanguageCodes = function(languages, userSettings, config) {
+    TranslationHandler.FillLanguageCodes = function(languages, userSettings) {
         var grid = XrmTranslator.GetGrid();
         var languageCount = languages.length;
 
@@ -1357,15 +1370,10 @@
                 var language = languages[i];
                 var locale = locales.find(function (l) { return l.localeid == language }) || {};
 
-                var editable = config.lockedLanguages && config.lockedLanguages.indexOf(language) !== -1 ? null : { type: 'text' };
                 var columnText = FormatLanguageColumnText(language, locale);
 
-                grid.addColumn({ field: language, text: columnText, size: columnWidth + "%", sortable: true, editable: editable });
+                grid.addColumn({ field: language, text: columnText, size: columnWidth + "%", sortable: true, editable: { type: 'text' } });
                 grid.addSearch({ field: language, text: columnText, type: 'text' });
-
-                if (config.hideLanguagesByDefault && language !== userSettings.uilanguageid) {
-                    grid.hideColumn(language);
-                }
             }
 
             return languages;

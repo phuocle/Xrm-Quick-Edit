@@ -155,28 +155,36 @@
     color: #c00000;
 }
 
+.xqt-translation-prompt-popup-form {
+    box-sizing: border-box;
+    height: 100%;
+    overflow: hidden;
+    width: 100%;
+}
+
 .xqt-translation-prompt-form {
     box-sizing: border-box;
+    display: block;
     max-width: 100%;
     overflow: hidden !important;
     padding: 26px 38px 8px;
     width: 100%;
 }
 
-.xqt-translation-prompt-field {
+.xqt-translation-prompt-row {
     align-items: center;
     box-sizing: border-box;
     display: grid;
     gap: 18px;
-    grid-template-columns: 145px minmax(0, 1fr);
+    grid-template-columns: 190px minmax(0, 1fr);
     margin: 0 0 10px !important;
     max-width: 100%;
     padding: 0 !important;
     width: 100%;
 }
 
-.xqt-translation-prompt-field > label {
-    float: none !important;
+.xqt-translation-prompt-label {
+    color: #222;
     line-height: 32px;
     margin: 0 !important;
     padding: 0 !important;
@@ -185,24 +193,44 @@
     width: auto !important;
 }
 
-.xqt-translation-prompt-field > div {
+.xqt-translation-prompt-control {
+    box-sizing: border-box;
     margin: 0 !important;
     min-width: 0;
     padding: 0 !important;
+    position: relative;
+    width: 100%;
 }
 
-.xqt-translation-prompt-field input[type="list"],
-.xqt-translation-prompt-field .w2ui-field-helper {
+.xqt-translation-prompt-control > input,
+.xqt-translation-prompt-control .w2ui-field-helper {
     box-sizing: border-box !important;
+    max-width: 100% !important;
     width: 100% !important;
 }
 
-.xqt-translation-prompt-check {
-    grid-template-columns: 230px minmax(0, 1fr);
+.xqt-translation-prompt-control .w2ui-field-helper input {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.xqt-translation-prompt-check .xqt-translation-prompt-control {
+    align-items: center;
+    display: flex;
+    justify-content: flex-start;
+    min-height: 32px;
+}
+
+.xqt-translation-prompt-check .xqt-translation-prompt-control > input,
+.xqt-translation-prompt-check .xqt-translation-prompt-control .w2ui-field-helper {
+    flex: 0 0 auto;
+    max-width: none !important;
+    width: auto !important;
 }
 
 .xqt-translation-prompt-check input[type="checkbox"] {
-    margin-left: 0;
+    margin: 0;
 }
 
 .w2ui-tb-icon > span[class^="icon-"],

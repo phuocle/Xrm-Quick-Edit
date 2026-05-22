@@ -181,20 +181,6 @@
             AttachLabels(translatedNode, gridNode);
         }
 
-        if (XrmTranslator.config.lockFormCells && name.toLowerCase() === "cell") {
-            var hasLabels = Object.keys(gridNode).some(function (key) {
-                if (key === "recid" || key === "schemaName" || key === "w2ui") {
-                    return false;
-                }
-
-                return !!String(gridNode[key] || "").trim();
-            });
-
-            if (!hasLabels) {
-                gridNode.w2ui.editable = false;
-            }
-        }
-
         return gridNode;
     }
 
