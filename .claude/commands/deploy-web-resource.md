@@ -1,65 +1,60 @@
 # Deploy Web Resource
 
-Deploy a single web resource file to Dataverse CRM.
+Deploy a local file to Dataverse as a web resource using MCP `manage_webresource`.
 
 ## Input
 
-$ARGUMENTS — the local file path to deploy (REQUIRED)
+$ARGUMENTS — local file path to deploy (REQUIRED)
 
-## Instructions
+## Steps
 
-**Step 1: Validate input**
+**Step 1: Validate**
 
-If `$ARGUMENTS` is empty or not provided, STOP immediately and tell the user:
+If `$ARGUMENTS` is empty → stop: "Usage: `/deploy-web-resource <local-path>`". If file does not exist → stop: "File `$ARGUMENTS` not found."
 
-> You must provide the local file path to deploy. Example: `/deploy-web-resource src/js/Translator/TranslationHandler.js`
+**Step 2: Resolve CRM unique name**
 
-Do NOT proceed further without a valid file path.
+Read `.claude/mapping-v2.xml`. If `$ARGUMENTS` matches a `LocalPath` → use its `UniqueName`.
 
-**Step 2: Verify the file exists**
+If not found, derive from convention:
 
-Check that the file at `$ARGUMENTS` actually exists in the project. If it does not exist, tell the user:
+| File pattern | UniqueName |
+|---|---|
+| `src2/js/Translator/*.js` | `pl_/XrmQuickTranslate/js/<filename>` |
+| `src2/js/PropertyEditor/*.js` | `pl_/XrmQuickTranslate/js/<filename>` |
+| `src2/lib/*.js` | `pl_/XrmQuickTranslate/js/<filename>` |
+| `src2/css/*.css` | `pl_/XrmQuickTranslate/css/<filename>` |
+| `src2/html/*.html` | `pl_/XrmQuickTranslate/html/<filename>` |
+| `src2/img/*.svg` | `pl_/img/<filename>` |
 
-> File `$ARGUMENTS` not found. Please check the path and try again.
+For new files not matching above → ask user for the desired CRM unique name.
 
-**Step 3: Read environment variables**
+**Step 3: Determine web resource type from file extension**
 
-Read the `.env` file at the project root. Parse the following variables:
+| Ext | Type |
+|---|---|
+| `.js` | `js` |
+| `.css` | `css` |
+| `.html` | `html` |
+| `.svg` | `svg` |
+| `.png` | `png` |
 
-- `DEVKIT_AUTH_TYPE`
-- `DEVKIT_URL`
-- `DEVKIT_CLIENT_ID`
-- `DEVKIT_CLIENT_SECRET`
+**Step 4: Check if web resource exists**
 
-If `.env` is missing or any of these variables are not set, tell the user:
+Call MCP `manage_webresource` with `action=detail`, `web_resource_id=<UniqueName>`.
 
-> Missing `.env` file or required environment variables. Please create a `.env` file at the project root with: `DEVKIT_AUTH_TYPE`, `DEVKIT_URL`, `DEVKIT_CLIENT_ID`, `DEVKIT_CLIENT_SECRET`.
+**Step 5: Create or Update**
 
-**Step 4: Find the CRM unique name from the mapping file**
+- **If exists**: `manage_webresource` with `action=update`, `web_resource_id=<UniqueName>`, `file_path=$ARGUMENTS`
+- **If not exists**: `manage_webresource` with `action=create`, `name=<UniqueName>`, `file_path=$ARGUMENTS`, `type=<type>`, `solution_name=XrmQuickTranslate`
 
-Determine which mapping file to use based on the file path:
-- If the file path starts with `src2/` → use `.claude/mapping-v2.xml`
-- Otherwise → use `.claude/mapping.xml`
+**For new JS files**: also register in `.claude/mapping-v2.xml` under the appropriate section.
 
-Read the chosen mapping file. It contains `<File>` entries mapping `LocalPath` to `UniqueName`.
+**Step 6: Report**
 
-Find the entry where `LocalPath` matches `$ARGUMENTS`. Extract the `UniqueName` attribute value.
+Success → "Deployed `$ARGUMENTS` as `<UniqueName>`."
+Failure → show error.
 
-If no mapping is found, tell the user:
+## Naming Convention (when creating new web resources)
 
-> No CRM mapping found for `$ARGUMENTS`. Check the mapping file (`.claude/mapping.xml` for src/, `.claude/mapping-v2.xml` for src2/) to ensure this file is mapped to a web resource.
-
-**Step 5: Deploy using devkit CLI**
-
-Run the following command and WAIT for it to complete (do NOT run in background):
-
-```
-devkit webresource --auth <DEVKIT_AUTH_TYPE> --url <DEVKIT_URL> --clientid <DEVKIT_CLIENT_ID> --clientsecret "<DEVKIT_CLIENT_SECRET>" -f "$ARGUMENTS" -w "<UniqueName>" --plain
-```
-
-Replace placeholders with values from `.env` (Step 3) and `<UniqueName>` from Step 4.
-
-**Step 6: Report result**
-
-- If the command succeeds, tell the user: **Deployed `$ARGUMENTS`** as `<UniqueName>` successfully.
-- If the command fails, show the full error output and tell the user the deployment failed.
+All must follow `pl_/XrmQuickTranslate/<type>/<name.ext>`. For new JS handlers follow the `src2/js/Translator/` or `src2/js/PropertyEditor/` directory pattern.
