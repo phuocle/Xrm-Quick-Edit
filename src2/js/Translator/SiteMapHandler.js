@@ -439,6 +439,8 @@
 
         var updatedXml = ApplyXmlUpdates(siteMapData.sitemapxml, updates);
 
+        XrmTranslator.LockGridProgress("Saving sitemap", 1, 1);
+
         return WebApiClient.Update({
             entityName: "sitemap",
             entityId: siteMapData.sitemapid,

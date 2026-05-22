@@ -208,8 +208,11 @@
             requests.push(request);
         }
 
+        var saveIndex = 0;
+
         return WebApiClient.Promise.resolve(requests)
             .each(function(request) {
+                XrmTranslator.LockGridProgress("Saving attributes", ++saveIndex, requests.length);
                 return WebApiClient.SendRequest(request.method, request.url, request.attribute, request.headers);
             })
             .then(function () {

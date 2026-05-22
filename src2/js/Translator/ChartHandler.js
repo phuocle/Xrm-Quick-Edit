@@ -157,8 +157,11 @@
             requests.push(request);
         }
 
+        var saveIndex = 0;
+
         return WebApiClient.Promise.resolve(requests)
             .each(function (request) {
+                XrmTranslator.LockGridProgress("Saving charts", ++saveIndex, requests.length);
                 return WebApiClient.Execute(request);
             })
             .then(function () {

@@ -309,8 +309,11 @@
             });
         }
 
+        var saveIndex = 0;
+
         return WebApiClient.Promise.resolve(requests)
             .each(function (request) {
+                XrmTranslator.LockGridProgress("Saving relationships", ++saveIndex, requests.length);
                 return WebApiClient.SendRequest(request.method, request.url, request.payload, request.headers);
             })
             .then(function () {

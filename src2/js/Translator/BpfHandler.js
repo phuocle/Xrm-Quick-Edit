@@ -416,8 +416,11 @@
 
         // For each workflow: Deactivate → Fetch XAML → Update XAML → Save XAML → Activate
         // On failure: restore original XAML → reactivate → report error
+        var saveIndex = 0;
+
         return WebApiClient.Promise.resolve(workflowIds)
             .each(function (workflowId) {
+                XrmTranslator.LockGridProgress("Saving business process flows", ++saveIndex, workflowIds.length);
                 var stageUpdates = updatedWorkflows[workflowId];
                 var originalXaml = null;
 

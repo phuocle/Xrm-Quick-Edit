@@ -48,6 +48,19 @@
 
     // Toggle quick DEBUG autofill button in toolbar (true = show, false = hide).
     XrmTranslator.showDebugButton = false;
+    XrmTranslator.showAllInOneType = false;
+
+    XrmTranslator.LockGridProgress = function (label, current, total) {
+        total = total || 0;
+        current = Math.min(current || 0, total);
+
+        if (total <= 0) {
+            XrmTranslator.LockGrid(label);
+            return;
+        }
+
+        XrmTranslator.LockGrid(label + " " + current + "/" + total);
+    };
 
     XrmTranslator.allEntities = [];
 
@@ -56,6 +69,21 @@
     var baseLanguageScopeDepth = 0;
     var baseLanguageRestoreLcid = null;
     var unfilteredRecords = null;
+    var CONFIG_WEBRESOURCE_NAMES = [
+        "pl_/XrmQuickTranslate/config/XrmQuickTranslateConfig.js",
+        "oss_/XrmQuickEdit/config/XrmQuickEditConfig.js"
+    ];
+    var DEFAULT_CONFIG = {
+        entityWhitelist: [],
+        entityWhiteList: [],
+        hideAutoTranslate: false,
+        hideFindAndReplace: false,
+        hideLanguagesByDefault: false,
+        lockedLanguages: [],
+        lockFormCells: false,
+        solutionUniqueName: null,
+        translationExceptions: []
+    };
 
 
 
@@ -458,8 +486,11 @@
 
         XrmTranslator.LockGrid("Adding components to solution");
 
+        var addIndex = 0;
+
         return WebApiClient.Promise.resolve(componentIds)
         .each(function(c) {
+            XrmTranslator.LockGridProgress("Adding components to solution", ++addIndex, componentIds.length);
             var request = WebApiClient.Requests.AddSolutionComponentRequest.with({
                 payload: {
                     ComponentId: c,
@@ -1221,9 +1252,10 @@
                     return 'Type: ' + el.text;
                 },
                 selected: 'sitemap',
-                items: [
+                items: (XrmTranslator.showAllInOneType ? [
                     { id: 'allInOne', text: 'All-In-One', icon: 'fa-camera' },
-                    { id: 'entitySeparator', text: '--' },
+                    { id: 'entitySeparator', text: '--' }
+                ] : []).concat([
                     { id: 'attributes', text: '1. Attributes', icon: 'fa-camera' },
                     { id: 'options', text: '2. Option Sets', icon: 'fa-picture' },
                     { id: 'forms', text: '3. Forms', icon: 'fa-picture' },
@@ -1238,7 +1270,7 @@
                     { id: 'dashboards', text: '2. Dashboards', icon: 'fa-picture' },
                     { id: 'webresources', text: '3. Web Resources', icon: 'fa-picture' },
                     { id: 'globalOptionSets', text: '4. Global Option Sets', icon: 'fa-picture' }
-                ]
+                ])
             },
             { type: 'menu-radio', id: 'component', icon: 'icon-folder',
                 text: function (item) {
@@ -1702,12 +1734,65 @@
         records.push(summary);
     };
 
-    function FetchConfig() {
-        return WebApiClient.Retrieve({ overriddenSetName: "webresourceset", entityId: "8AF4EAED-7454-E911-80FA-0050568E4745"})
-        .then(function (result) {
-                var config = JSON.parse(atob(result.content));
+    function EscapeODataString(value) {
+        return String(value || "").replace(/'/g, "''");
+    }
 
-                XrmTranslator.config = config;
+    function CloneDefaultConfig() {
+        return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+    }
+
+    function NormalizeConfig(config) {
+        var normalized = CloneDefaultConfig();
+
+        if (config && typeof config === "object") {
+            Object.keys(config).forEach(function (key) {
+                normalized[key] = config[key];
+            });
+        }
+
+        if (!normalized.entityWhitelist.length && normalized.entityWhiteList.length) {
+            normalized.entityWhitelist = normalized.entityWhiteList;
+        }
+
+        return normalized;
+    }
+
+    function DecodeConfigContent(content) {
+        if (!content) {
+            return {};
+        }
+
+        return JSON.parse(atob(content));
+    }
+
+    function FindConfigWebResource(configNames) {
+        var names = configNames.slice(0);
+
+        function next() {
+            var configName = names.shift();
+
+            if (!configName) {
+                return Promise.resolve(null);
+            }
+
+            return WebApiClient.Retrieve({
+                overriddenSetName: "webresourceset",
+                queryParams: "?$select=webresourceid,name,content&$filter=name eq '" + EscapeODataString(configName) + "'"
+            })
+            .then(function (result) {
+                var records = result && result.value ? result.value : [];
+                return records.length ? records[0] : next();
+            });
+        }
+
+        return next();
+    }
+
+    function FetchConfig() {
+        return FindConfigWebResource(CONFIG_WEBRESOURCE_NAMES)
+        .then(function (webResource) {
+            XrmTranslator.config = NormalizeConfig(webResource ? DecodeConfigContent(webResource.content) : null);
         });
     }
 

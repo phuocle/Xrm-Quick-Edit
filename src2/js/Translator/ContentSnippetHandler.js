@@ -228,8 +228,11 @@
             return ContentSnippetHandler.Load();
         }
 
+        var saveIndex = 0;
+
         return WebApiClient.Promise.resolve(updates)
             .each(function(payload) {
+                XrmTranslator.LockGridProgress("Saving content snippets", ++saveIndex, updates.length);
                 if (payload.entityId) {
                     return WebApiClient.Update(payload);
                 }

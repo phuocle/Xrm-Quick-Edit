@@ -368,6 +368,27 @@
         var grid = XrmTranslator.GetGrid();
         var savable = false;
 
+        function hasSearchValue(value) {
+            return value !== null && typeof value !== "undefined" && String(value).trim() !== "";
+        }
+
+        function clearEmptySearchState() {
+            var hasActiveSearch = false;
+            var searchData = grid.searchData || [];
+
+            for (var i = 0; i < searchData.length; i++) {
+                if (hasSearchValue(searchData[i] && searchData[i].value)) {
+                    hasActiveSearch = true;
+                    break;
+                }
+            }
+
+            if (!hasActiveSearch && !hasSearchValue(grid.last && grid.last.search) && typeof grid.searchReset === "function") {
+                grid.searchReset(true);
+                grid.refresh();
+            }
+        }
+
         for (var i = 0; i < selected.length; i++) {
             var select = selected[i];
 
@@ -394,6 +415,8 @@
         if (savable) {
             XrmTranslator.SetSaveButtonDisabled(false);
         }
+
+        clearEmptySearchState();
     }
 
     TranslationHandler.ApplyDebugTranslations = function () {

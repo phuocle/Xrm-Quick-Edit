@@ -633,6 +633,7 @@
         var update = ApplyUpdates(updates, XrmTranslator.metadata, formXml);
 
         var executeSave = function () {
+            XrmTranslator.LockGridProgress("Saving forms", 1, 1);
             return WebApiClient.Update({
                 entityName: "systemform",
                 entityId: XrmTranslator.metadata.formid,
@@ -665,6 +666,7 @@
         if (payload) {
             // Direct payload from RemoveOverriddenCellLabels
             savePromise = XrmTranslator.RunAsBaseLanguage(function () {
+            XrmTranslator.LockGridProgress("Saving forms", 1, 1);
             return WebApiClient.Update({
                 entityName: "systemform",
                 entityId: XrmTranslator.metadata.formid,

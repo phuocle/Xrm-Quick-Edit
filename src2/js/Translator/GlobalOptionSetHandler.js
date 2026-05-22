@@ -184,8 +184,11 @@
             }
         }
 
+        var saveIndex = 0;
+
         return WebApiClient.Promise.resolve(updates)
             .each(function (payload) {
+                XrmTranslator.LockGridProgress("Saving global option sets", ++saveIndex, updates.length);
                 return WebApiClient.SendRequest("POST", WebApiClient.GetApiUrl() + "UpdateOptionValue", payload);
             })
             .then(function () {

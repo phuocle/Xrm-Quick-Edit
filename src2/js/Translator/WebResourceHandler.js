@@ -219,8 +219,11 @@
         var records = XrmTranslator.GetAllRecords();
         var updates = GetUpdates(records);
 
+        var saveIndex = 0;
+
         return WebApiClient.Promise.resolve(updates)
         .mapSeries(function(webresource) {
+            XrmTranslator.LockGridProgress("Saving web resources", ++saveIndex, updates.length);
             var content = b64EncodeUnicode(JSON.stringify(webresource.content));
 
             if (webresource.webresourceid) {
