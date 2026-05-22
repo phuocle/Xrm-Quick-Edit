@@ -43,17 +43,20 @@
         return record[lcid] || record[String(lcid)] || "";
     }
 
-    function HasTranslationText(value) {
+    function NormalizeTranslationText(value) {
         if (value === null || typeof value === "undefined") {
-            return false;
+            return "";
         }
 
         return String(value)
             .replace(/&nbsp;/gi, " ")
             .replace(/\u00a0/g, " ")
             .replace(/<[^>]*>/g, "")
-            .trim()
-            .length > 0;
+            .trim();
+    }
+
+    function HasTranslationText(value) {
+        return NormalizeTranslationText(value).length > 0;
     }
 
     function GetSavedTranslationPrompt() {
@@ -716,7 +719,7 @@
             }
 
             if (mode === "missingOrIdentical") {
-                return !HasTranslationText(targetVal) || sourceVal === targetVal;
+                return !HasTranslationText(targetVal) || NormalizeTranslationText(sourceVal) === NormalizeTranslationText(targetVal);
             }
 
             if (mode === "overwrite") {
@@ -945,7 +948,7 @@
                                 }
 
                                 if (translateMissingVal === "missingOrIdentical") {
-                                    return !HasTranslationText(targetVal) || sourceVal === targetVal;
+                                    return !HasTranslationText(targetVal) || NormalizeTranslationText(sourceVal) === NormalizeTranslationText(targetVal);
                                 }
 
                                 // "missing" - only records without target translation
@@ -960,7 +963,7 @@
                             recordFilter,
                             {
                                 sourceLcid: sourceLcid,
-                                excludeEmptySource: true,
+                                excludeEmptySource: translateMissingVal !== "overwrite",
                                 emptyMessage: translateMissingVal === "overwrite"
                                     ? "No records with source text found for the selected source language."
                                     : "No matching records found. All records already have translations for the target language."
@@ -1269,10 +1272,10 @@
                     var sourceVal = getCurrentValue(record, baseLcid);
                     var targetVal = getCurrentValue(record, targetLcid);
 
-                    if (!sourceVal) return false;
+                    if (!HasTranslationText(sourceVal)) return false;
 
-                    if (mode === "missing") return !targetVal;
-                    if (mode === "missingOrIdentical") return !targetVal || sourceVal === targetVal;
+                    if (mode === "missing") return !HasTranslationText(targetVal);
+                    if (mode === "missingOrIdentical") return !HasTranslationText(targetVal) || NormalizeTranslationText(sourceVal) === NormalizeTranslationText(targetVal);
                     return true; // overwrite
                 });
 
