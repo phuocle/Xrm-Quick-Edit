@@ -47,8 +47,8 @@
     XrmTranslator.defaultSchemaNameSize = "20%";
 
     // Toggle quick DEBUG autofill button in toolbar (true = show, false = hide).
-    XrmTranslator.showDebugButton = false;
-    XrmTranslator.showAllInOneType = false;
+    XrmTranslator.showDebugButton = true;
+    XrmTranslator.showAllInOneType = true;
 
     XrmTranslator.LockGridProgress = function (label, current, total) {
         total = total || 0;
@@ -1639,8 +1639,11 @@
         toolbarItems.push({ type: 'spacer' });
 
         if (XrmTranslator.showDebugButton) {
-            toolbarItems.push({ type: 'button', id: 'debugAutofill', text: '', tooltip: 'Apply debug translations', icon: 'icon-debug', onClick: function () {
+            toolbarItems.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', tooltip: 'Apply debug translations', icon: 'icon-debug', onClick: function () {
                 TranslationHandler.ApplyDebugTranslations();
+            } });
+            toolbarItems.push({ type: 'button', id: 'debugEmpty', text: 'DEBUG EMPTY', tooltip: 'Clear translated columns', icon: 'icon-eraser', onClick: function () {
+                TranslationHandler.ApplyDebugEmptyTranslations();
             } });
         }
 

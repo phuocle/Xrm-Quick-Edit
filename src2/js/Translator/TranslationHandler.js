@@ -521,6 +521,50 @@
         .catch(XrmTranslator.errorHandler);
     }
 
+    TranslationHandler.ApplyDebugEmptyTranslations = function () {
+        XrmTranslator.LockGrid("Clearing debug translations...");
+
+        return XrmTranslator.GetBaseLanguage()
+        .then(function (baseLanguage) {
+            var grid = XrmTranslator.GetGrid();
+            var baseLcid = String(baseLanguage);
+            var languageColumns = XrmTranslator.GetColumns(false).map(function (c) { return String(c); });
+            var targetColumns = languageColumns.filter(function (lcid) { return lcid !== baseLcid; });
+            var records = XrmTranslator.GetAllRecords();
+            var updates = 0;
+
+            for (var i = 0; i < records.length; i++) {
+                var record = records[i];
+
+                if ((record.w2ui && record.w2ui.summary) || record._isGroupNode || (record.w2ui && record.w2ui.editable === false)) {
+                    continue;
+                }
+
+                if (!record.w2ui) {
+                    record.w2ui = {};
+                }
+
+                if (!record.w2ui.changes) {
+                    record.w2ui.changes = {};
+                }
+
+                for (var j = 0; j < targetColumns.length; j++) {
+                    record.w2ui.changes[targetColumns[j]] = "";
+                    updates++;
+                }
+
+                grid.refreshRow(record.recid);
+            }
+
+            if (updates > 0) {
+                XrmTranslator.SetSaveButtonDisabled(false);
+            }
+
+            XrmTranslator.UnlockGrid();
+        })
+        .catch(XrmTranslator.errorHandler);
+    }
+
     function ShowTranslationResults (results) {
         if (!w2ui.translationResultGrid) {
             new w2grid({
