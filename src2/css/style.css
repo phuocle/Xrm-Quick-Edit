@@ -155,6 +155,56 @@
     color: #c00000;
 }
 
+.xqt-translation-prompt-form {
+    box-sizing: border-box;
+    max-width: 100%;
+    overflow: hidden !important;
+    padding: 26px 38px 8px;
+    width: 100%;
+}
+
+.xqt-translation-prompt-field {
+    align-items: center;
+    box-sizing: border-box;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 145px minmax(0, 1fr);
+    margin: 0 0 10px !important;
+    max-width: 100%;
+    padding: 0 !important;
+    width: 100%;
+}
+
+.xqt-translation-prompt-field > label {
+    float: none !important;
+    line-height: 32px;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
+    white-space: nowrap;
+    width: auto !important;
+}
+
+.xqt-translation-prompt-field > div {
+    margin: 0 !important;
+    min-width: 0;
+    padding: 0 !important;
+}
+
+.xqt-translation-prompt-field input[type="list"],
+.xqt-translation-prompt-field .w2ui-field-helper {
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+
+.xqt-translation-prompt-check {
+    grid-template-columns: 230px minmax(0, 1fr);
+}
+
+.xqt-translation-prompt-check input[type="checkbox"] {
+    margin-left: 0;
+}
+
 .w2ui-tb-icon > span[class^="icon-"],
 .w2ui-tb-icon > span[class*=" icon-"],
 .w2ui-icon[class^="icon-"],

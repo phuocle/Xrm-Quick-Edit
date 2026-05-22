@@ -59,9 +59,9 @@
     function GetGeminiConfig() {
         try {
             var stored = localStorage.getItem(GEMINI_CONFIG_KEY);
-            return stored ? JSON.parse(stored) : { apiKey: "", modelName: "gemini-2.0-flash", customPrompt: "" };
+            return stored ? JSON.parse(stored) : { apiKey: "", modelName: "gemini-3.1-flash-lite", customPrompt: "" };
         } catch(e) {
-            return { apiKey: "", modelName: "gemini-2.0-flash", customPrompt: "" };
+            return { apiKey: "", modelName: "gemini-3.1-flash-lite", customPrompt: "" };
         }
     }
 
@@ -256,6 +256,7 @@
 
                 translations.push({
                     recid: record.recid,
+                    targetRecid: record.recid,
                     schemaName: record.schemaName,
                     column: destLcid,
                     source: record[fromLcid],
@@ -352,6 +353,7 @@
 
                 translations.push({
                     recid: record.recid,
+                    targetRecid: record.recid,
                     schemaName: record.schemaName,
                     column: destLcid,
                     source: record[fromLcid],
@@ -419,7 +421,12 @@
             var select = selected[i];
 
             var result = XrmTranslator.GetByRecId(results, select);
-            var record = XrmTranslator.GetByRecId(XrmTranslator.GetAllRecords(), result.recid);
+            if (!result) {
+                continue;
+            }
+
+            var targetRecid = result.targetRecid || result.recid;
+            var record = XrmTranslator.GetByRecId(XrmTranslator.GetAllRecords(), targetRecid);
 
             if (!record) {
                 continue;
@@ -440,6 +447,7 @@
 
         if (savable) {
             XrmTranslator.SetSaveButtonDisabled(false);
+            grid.refresh();
         }
 
         clearEmptySearchState();
@@ -566,6 +574,39 @@
     }
 
     function ShowTranslationResults (results) {
+        function getOptionSetResultLabel(result) {
+            var targetRecid = result && (result.targetRecid || result.recid);
+            var schemaName = result ? result.schemaName : "";
+            var separatorIndex = targetRecid ? String(targetRecid).indexOf("|") : -1;
+
+            if (separatorIndex === -1) {
+                return schemaName;
+            }
+
+            var attributeId = String(targetRecid).substring(0, separatorIndex);
+            var attribute = XrmTranslator.GetAttributeById(attributeId);
+
+            if (!attribute || !attribute.LogicalName) {
+                return schemaName;
+            }
+
+            return attribute.LogicalName + " | " + schemaName;
+        }
+
+        function normalizeResultRecords(rawResults) {
+            var normalized = [];
+
+            for (var i = 0; i < rawResults.length; i++) {
+                var result = Object.assign({}, rawResults[i]);
+                result.targetRecid = result.targetRecid || result.recid;
+                result.recid = "translationResult_" + i;
+                result.schemaName = getOptionSetResultLabel(result);
+                normalized.push(result);
+            }
+
+            return normalized;
+        }
+
         if (!w2ui.translationResultGrid) {
             new w2grid({
                 name: 'translationResultGrid',
@@ -591,6 +632,7 @@
             });
         }
 
+        results = normalizeResultRecords(results || []);
         w2ui.translationResultGrid.clear();
         w2ui.translationResultGrid.add(results);
 
@@ -834,26 +876,26 @@
                 name: 'translationPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 110px; white-space: nowrap;">Source Lcid: <span style="color: red;">*</span></label>'+
-                    '        <input name="sourceLcid" type="list" style="flex: 1; width: 100%;"/>'+
+                    '<div class="w2ui-page page-0 xqt-translation-prompt-form">'+
+                    '    <div class="w2ui-field xqt-translation-prompt-field">'+
+                    '        <label>Source Lcid: <span style="color: red;">*</span></label>'+
+                    '        <div><input name="sourceLcid" type="list" /></div>'+
                     '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 110px; white-space: nowrap;">Target Lcid: <span style="color: red;">*</span></label>'+
-                    '        <input name="targetLcid" type="list" style="flex: 1; width: 100%;"/>'+
+                    '    <div class="w2ui-field xqt-translation-prompt-field">'+
+                    '        <label>Target Lcid: <span style="color: red;">*</span></label>'+
+                    '        <div><input name="targetLcid" type="list" /></div>'+
                     '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 110px; white-space: nowrap;">Translate All:</label>'+
-                    '        <input name="translateMissing" type="list" style="flex: 1; width: 100%;"/>'+
+                    '    <div class="w2ui-field xqt-translation-prompt-field">'+
+                    '        <label>Translate All:</label>'+
+                    '        <div><input name="translateMissing" type="list" /></div>'+
                     '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 110px; white-space: nowrap;">API Provider:</label>'+
-                    '        <input name="apiProvider" type="list" style="flex: 1; width: 100%;"/>'+
+                    '    <div class="w2ui-field xqt-translation-prompt-field">'+
+                    '        <label>API Provider:</label>'+
+                    '        <div><input name="apiProvider" type="list" /></div>'+
                     '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 210px; white-space: nowrap;">Use Dictionary as First Priority:</label>'+
-                    '        <input name="useDictionaryFirst" type="checkbox" style="margin-left: 0;"/>'+
+                    '    <div class="w2ui-field xqt-translation-prompt-field xqt-translation-prompt-check">'+
+                    '        <label>Use Dictionary as First Priority:</label>'+
+                    '        <div><input name="useDictionaryFirst" type="checkbox" /></div>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -906,7 +948,13 @@
                             };
                         }
 
-                        XrmTranslator.ShowRecordSelector("TranslationHandler.ProposeTranslations", [sourceLcid, targetLcid, translateMissingVal, apiProviderVal, useDictionaryFirstVal], (XrmTranslator.GetGrid().getSelection() || []), recordFilter);
+                        XrmTranslator.ShowRecordSelector(
+                            "TranslationHandler.ProposeTranslations",
+                            [sourceLcid, targetLcid, translateMissingVal, apiProviderVal, useDictionaryFirstVal],
+                            (XrmTranslator.GetGrid().getSelection() || []),
+                            recordFilter,
+                            { sourceLcid: sourceLcid, excludeEmptySource: true }
+                        );
                     },
                     "cancel": function () {
                         w2popup.close();
@@ -932,7 +980,7 @@
         InitializeTranslationPrompt()
         .then(function() {
             w2popup.open({
-                title   : 'Choose tranlations source and destination',
+                title   : 'Choose translations source and destination',
                 name    : 'translationPopup',
                 body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
                 style   : 'padding: 15px 0px 0px 0px',
@@ -991,7 +1039,7 @@
         ];
         var aiSettingsRecord = {
             geminiApiKey: maskedGeminiKey,
-            geminiModelName: geminiConfig.modelName || "gemini-2.0-flash",
+            geminiModelName: geminiConfig.modelName || "gemini-3.1-flash-lite",
             geminiCustomPrompt: geminiConfig.customPrompt || ""
         };
 
@@ -1045,7 +1093,7 @@
                         }
                         SaveGeminiConfig({
                             apiKey: geminiKeyToSave || "",
-                            modelName: this.record.geminiModelName || "gemini-2.0-flash",
+                            modelName: this.record.geminiModelName || "gemini-3.1-flash-lite",
                             customPrompt: this.record.geminiCustomPrompt || ""
                         });
 

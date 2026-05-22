@@ -696,6 +696,72 @@
         .catch(XrmTranslator.errorHandler);
     }
 
+    XrmTranslator.BatchSaveSize = 25;
+
+    XrmTranslator.CreateBatchName = function(prefix) {
+        return prefix + "_" + Date.now() + "_" + Math.floor(Math.random() * 1000000);
+    };
+
+    XrmTranslator.ChunkArray = function(items, chunkSize) {
+        var chunks = [];
+
+        for (var i = 0; i < items.length; i += chunkSize) {
+            chunks.push(items.slice(i, i + chunkSize));
+        }
+
+        return chunks;
+    };
+
+    XrmTranslator.ExecuteChangeSetBatches = function(items, options) {
+        options = options || {};
+
+        var batchSize = options.batchSize || XrmTranslator.BatchSaveSize;
+        var batches = XrmTranslator.ChunkArray(items || [], batchSize);
+        var progressLabel = options.progressLabel || "Saving batches";
+        var batchNamePrefix = options.batchNamePrefix || "batch";
+        var changeSetNamePrefix = options.changeSetNamePrefix || "changeset";
+        var buildRequest = options.buildRequest;
+        var saveIndex = 0;
+
+        if (!buildRequest) {
+            throw new Error("XrmTranslator.ExecuteChangeSetBatches requires buildRequest.");
+        }
+
+        return WebApiClient.Promise.resolve(batches)
+            .each(function(batchItems, batchIndex) {
+                XrmTranslator.LockGridProgress(progressLabel, ++saveIndex, batches.length);
+
+                var requests = batchItems.map(function(item, index) {
+                    return buildRequest(item, {
+                        batchIndex: batchIndex,
+                        index: index,
+                        contentId: (batchIndex * batchSize) + index + 1
+                    });
+                });
+
+                var changeSet = new WebApiClient.ChangeSet({
+                    name: XrmTranslator.CreateBatchName(changeSetNamePrefix),
+                    requests: requests
+                });
+
+                var batch = new WebApiClient.Batch({
+                    name: XrmTranslator.CreateBatchName(batchNamePrefix),
+                    changeSets: [changeSet]
+                });
+
+                return WebApiClient.SendBatch(batch)
+                    .then(function(response) {
+                        if (response && response.isFaulted) {
+                            var errorMessage = response.errors && response.errors.length > 0
+                                ? response.errors.map(function(error) { return error.message || error.code || error; }).join("\n")
+                                : progressLabel + " failed.";
+
+                            throw new Error(errorMessage);
+                        }
+                    });
+            });
+    };
+
     XrmTranslator.GetRecord = function(records, selector) {
         for (var i = 0; i < records.length; i++) {
             var record = records[i];
@@ -965,7 +1031,9 @@
         }
     };
 
-    XrmTranslator.ShowRecordSelector = function (callbackName, callbackParameters, preselectedRecords, recordFilter) {
+    XrmTranslator.ShowRecordSelector = function (callbackName, callbackParameters, preselectedRecords, recordFilter, options) {
+        options = options || {};
+
         if (!w2ui.recordSelectorGrid) {
             new w2grid({
                 name: 'recordSelectorGrid',
@@ -1011,10 +1079,10 @@
         w2ui.recordSelectorGrid.clear();
         var allRecords = JSON.parse(JSON.stringify(XrmTranslator.GetGrid().records)).map(removeHideCheckBoxFlag);
 
-        var baseLang = XrmTranslator.baseLanguage ? XrmTranslator.baseLanguage.toString() : null;
-        if (baseLang) {
+        var sourceLang = options.sourceLcid ? String(options.sourceLcid) : (XrmTranslator.baseLanguage ? XrmTranslator.baseLanguage.toString() : null);
+        if (sourceLang) {
             var setSourceTextRecursive = function(record, lang) {
-                record.sourceText = record[lang] || '';
+                record.sourceText = record[lang] || record[String(lang)] || '';
                 if (record.w2ui && Array.isArray(record.w2ui.children)) {
                     record.w2ui.children.forEach(function(child) {
                         setSourceTextRecursive(child, lang);
@@ -1022,7 +1090,7 @@
                 }
             };
             allRecords.forEach(function(r) {
-                setSourceTextRecursive(r, baseLang);
+                setSourceTextRecursive(r, sourceLang);
             });
         }
 
@@ -1030,10 +1098,21 @@
         if (recordFilter) {
             var filterRecursive = function(records) {
                 return records.filter(function(r) {
+                    var hasChildren = r.w2ui && Array.isArray(r.w2ui.children);
+
                     if (r.w2ui && Array.isArray(r.w2ui.children)) {
                         r.w2ui.children = filterRecursive(r.w2ui.children);
                         if (r.w2ui.children.length > 0) return true;
                     }
+
+                    if (options.excludeEmptySource && (!r.sourceText || String(r.sourceText).trim() === "")) {
+                        return false;
+                    }
+
+                    if (hasChildren) {
+                        return false;
+                    }
+
                     return recordFilter(r);
                 });
             };

@@ -1525,6 +1525,7 @@
                     if (matchedTarget) {
                         matchedResults.push({
                             recid: record.recid,
+                            targetRecid: record.recid,
                             schemaName: record.schemaName,
                             column: targetLcid,
                             source: source,

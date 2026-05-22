@@ -146,6 +146,22 @@
         return updates;
     }
 
+    function SaveOptionValueUpdates(updates) {
+        return XrmTranslator.ExecuteChangeSetBatches(updates, {
+            progressLabel: "Saving option set batches",
+            batchNamePrefix: "batch_updateoptionvalue",
+            changeSetNamePrefix: "changeset_updateoptionvalue",
+            buildRequest: function(payload, context) {
+                return new WebApiClient.BatchRequest({
+                    method: "POST",
+                    url: WebApiClient.GetApiUrl() + "UpdateOptionValue",
+                    payload: payload,
+                    contentId: context.contentId
+                });
+            }
+        });
+    }
+
     function HandleOptionSets(attribute, options, records) {
         if (!options || options.length === 0) {
             return;
@@ -264,13 +280,7 @@
             return WebApiClient.Promise.resolve({ globalOptionSetNames: [] });
         }
 
-        var saveIndex = 0;
-
-        return WebApiClient.Promise.resolve(updates)
-            .each(function(payload) {
-                XrmTranslator.LockGridProgress("Saving option sets", ++saveIndex, updates.length);
-                return WebApiClient.SendRequest("POST", WebApiClient.GetApiUrl() + "UpdateOptionValue", payload);
-            })
+        return SaveOptionValueUpdates(updates)
             .then(function () {
                 return Promise.all([
                     XrmTranslator.AddToSolution(updateIds[0], XrmTranslator.ComponentType.Attribute),
@@ -295,13 +305,7 @@
             return OptionSetHandler.Load();
         }
 
-        var saveIndex = 0;
-
-        return WebApiClient.Promise.resolve(updates)
-            .each(function(payload) {
-                XrmTranslator.LockGridProgress("Saving option sets", ++saveIndex, updates.length);
-                return WebApiClient.SendRequest("POST", WebApiClient.GetApiUrl() + "UpdateOptionValue", payload);
-            })
+        return SaveOptionValueUpdates(updates)
             .then(function () {
                 XrmTranslator.LockGrid("Publishing");
                 return XrmTranslator.Publish(updateIds[2]);
