@@ -29,6 +29,7 @@
     var GEMINI_CONFIG_KEY = "XrmQuickEdit_GeminiConfig";
     var OPENAI_CONFIG_KEY = "XrmQuickEdit_OpenAIConfig";
     var TRANSLATION_PROMPT_KEY = "XrmQuickEdit_TranslationPrompt";
+    var OPENAI_ENABLED = false;
     var translationProviders = [];
 
     function GetSavedTranslationPrompt() {
@@ -102,7 +103,7 @@
         var locByColumns = XrmTranslator.GetGrid().columns.find(function(c) { return c.field === lcid});
 
         if (locByColumns) {
-            return locByColumns.caption.substr(0, 2);
+            return GetColumnDisplayText(locByColumns).substr(0, 2);
         }
 
         return null;
@@ -140,6 +141,14 @@
                 text: provider.text
             };
         });
+    }
+
+    function GetColumnDisplayText(column) {
+        if (!column) {
+            return "";
+        }
+
+        return column.text || column.caption || column.label || String(column.field || "");
     }
 
     const geminiTranslator = function (apiKey, modelName, customPrompt) {
@@ -334,23 +343,25 @@
         };
     };
 
-    RegisterTranslationProvider({
-        id: "openai",
-        text: "OpenAI",
-        validate: function() {
-            var openAIConfig = GetOpenAIConfig();
+    if (OPENAI_ENABLED) {
+        RegisterTranslationProvider({
+            id: "openai",
+            text: "OpenAI",
+            validate: function() {
+                var openAIConfig = GetOpenAIConfig();
 
-            if (!openAIConfig || !openAIConfig.apiKey) {
-                return "OpenAI: API Key is missing. Please configure it via AI Settings.";
+                if (!openAIConfig || !openAIConfig.apiKey) {
+                    return "OpenAI: API Key is missing. Please configure it via AI Settings.";
+                }
+
+                return null;
+            },
+            create: function() {
+                var openAIConfig = GetOpenAIConfig();
+                return new openAITranslator(openAIConfig.apiKey, openAIConfig.modelName, openAIConfig.customPrompt);
             }
-
-            return null;
-        },
-        create: function() {
-            var openAIConfig = GetOpenAIConfig();
-            return new openAITranslator(openAIConfig.apiKey, openAIConfig.modelName, openAIConfig.customPrompt);
-        }
-    });
+        });
+    }
 
     TranslationHandler.ApplyTranslations = function (selected, results) {
         var grid = XrmTranslator.GetGrid();
@@ -690,7 +701,7 @@
                 continue;
             }
 
-            languageItems.push({ id: availableLanguages[i].field, text: availableLanguages[i].caption });
+            languageItems.push({ id: availableLanguages[i].field, text: GetColumnDisplayText(availableLanguages[i]) });
         }
 
         var saved = GetSavedTranslationPrompt();
@@ -865,64 +876,76 @@
         var openaiConfig = GetOpenAIConfig();
         var maskedGeminiKey = MaskApiKey(geminiConfig.apiKey);
         var maskedOpenaiKey = MaskApiKey(openaiConfig.apiKey);
+        var aiSettingsTabs = [
+            { id: 'tab-google', text: 'Google' }
+        ];
+        var aiSettingsFormHTML =
+            '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
+            '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+            '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
+            '        <input name="geminiApiKey" type="password" style="flex: 1; width: 100%;"/>'+
+            '    </div>'+
+            '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+            '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
+            '        <input name="geminiModelName" type="text" style="flex: 1; width: 100%;"/>'+
+            '    </div>'+
+            '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
+            '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
+            '        <textarea name="geminiCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
+            '    </div>'+
+            '</div>';
+        var aiSettingsFields = [
+            { field: 'geminiApiKey', type: 'text', html: { page: 0 } },
+            { field: 'geminiModelName', type: 'text', html: { page: 0 } },
+            { field: 'geminiCustomPrompt', type: 'text', html: { page: 0 } }
+        ];
+        var aiSettingsRecord = {
+            geminiApiKey: maskedGeminiKey,
+            geminiModelName: geminiConfig.modelName || "gemini-2.0-flash",
+            geminiCustomPrompt: geminiConfig.customPrompt || ""
+        };
+
+        if (OPENAI_ENABLED) {
+            aiSettingsTabs.push({ id: 'tab-openai', text: 'OpenAI' });
+            aiSettingsFormHTML +=
+                '<div class="w2ui-page page-1" style="padding: 15px 25px;">'+
+                '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
+                '        <input name="openaiApiKey" type="password" style="flex: 1; width: 100%;"/>'+
+                '    </div>'+
+                '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
+                '        <input name="openaiModelName" type="text" style="flex: 1; width: 100%;"/>'+
+                '    </div>'+
+                '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
+                '        <textarea name="openaiCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
+                '    </div>'+
+                '</div>';
+            aiSettingsFields.push(
+                { field: 'openaiApiKey', type: 'text', html: { page: 1 } },
+                { field: 'openaiModelName', type: 'text', html: { page: 1 } },
+                { field: 'openaiCustomPrompt', type: 'text', html: { page: 1 } }
+            );
+            aiSettingsRecord.openaiApiKey = maskedOpenaiKey;
+            aiSettingsRecord.openaiModelName = openaiConfig.modelName || "gpt-4o-mini";
+            aiSettingsRecord.openaiCustomPrompt = openaiConfig.customPrompt || "";
+        }
+
+        aiSettingsFormHTML +=
+            '<div class="w2ui-buttons">'+
+            '    <button class="w2ui-btn" name="cancel">Cancel</button>'+
+            '    <button class="w2ui-btn" name="save">Save</button>'+
+            '</div>';
 
         if (!w2ui.aiSettings) {
             new w2form({
                 name: 'aiSettings',
                 style: 'border: 0px; background-color: transparent;',
-                tabs: [
-                    { id: 'tab-google', text: 'Google' },
-                    { id: 'tab-openai', text: 'OpenAI' }
-                ],
-                formHTML:
-                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
-                    '        <input name="geminiApiKey" type="password" style="flex: 1; width: 100%;"/>'+
-                    '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
-                    '        <input name="geminiModelName" type="text" style="flex: 1; width: 100%;"/>'+
-                    '    </div>'+
-                    '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
-                    '        <textarea name="geminiCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
-                    '    </div>'+
-                    '</div>'+
-                    '<div class="w2ui-page page-1" style="padding: 15px 25px;">'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
-                    '        <input name="openaiApiKey" type="password" style="flex: 1; width: 100%;"/>'+
-                    '    </div>'+
-                    '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
-                    '        <input name="openaiModelName" type="text" style="flex: 1; width: 100%;"/>'+
-                    '    </div>'+
-                    '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
-                    '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
-                    '        <textarea name="openaiCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
-                    '    </div>'+
-                    '</div>'+
-                    '<div class="w2ui-buttons">'+
-                    '    <button class="w2ui-btn" name="cancel">Cancel</button>'+
-                    '    <button class="w2ui-btn" name="save">Save</button>'+
-                    '</div>',
-                fields: [
-                    { field: 'geminiApiKey', type: 'text', html: { page: 0 } },
-                    { field: 'geminiModelName', type: 'text', html: { page: 0 } },
-                    { field: 'geminiCustomPrompt', type: 'text', html: { page: 0 } },
-                    { field: 'openaiApiKey', type: 'text', html: { page: 1 } },
-                    { field: 'openaiModelName', type: 'text', html: { page: 1 } },
-                    { field: 'openaiCustomPrompt', type: 'text', html: { page: 1 } }
-                ],
-                record: {
-                    geminiApiKey: maskedGeminiKey,
-                    geminiModelName: geminiConfig.modelName || "gemini-2.0-flash",
-                    geminiCustomPrompt: geminiConfig.customPrompt || "",
-                    openaiApiKey: maskedOpenaiKey,
-                    openaiModelName: openaiConfig.modelName || "gpt-4o-mini",
-                    openaiCustomPrompt: openaiConfig.customPrompt || ""
-                },
+                tabs: aiSettingsTabs,
+                formHTML: aiSettingsFormHTML,
+                fields: aiSettingsFields,
+                record: aiSettingsRecord,
                 actions: {
                     "save": function () {
                         var currentGemini = GetGeminiConfig();
@@ -936,16 +959,18 @@
                             customPrompt: this.record.geminiCustomPrompt || ""
                         });
 
-                        var currentOpenai = GetOpenAIConfig();
-                        var openaiKeyToSave = this.record.openaiApiKey;
-                        if (openaiKeyToSave && openaiKeyToSave.indexOf("*") !== -1 && currentOpenai && currentOpenai.apiKey) {
-                            openaiKeyToSave = currentOpenai.apiKey;
+                        if (OPENAI_ENABLED) {
+                            var currentOpenai = GetOpenAIConfig();
+                            var openaiKeyToSave = this.record.openaiApiKey;
+                            if (openaiKeyToSave && openaiKeyToSave.indexOf("*") !== -1 && currentOpenai && currentOpenai.apiKey) {
+                                openaiKeyToSave = currentOpenai.apiKey;
+                            }
+                            SaveOpenAIConfig({
+                                apiKey: openaiKeyToSave || "",
+                                modelName: this.record.openaiModelName || "gpt-4o-mini",
+                                customPrompt: this.record.openaiCustomPrompt || ""
+                            });
                         }
-                        SaveOpenAIConfig({
-                            apiKey: openaiKeyToSave || "",
-                            modelName: this.record.openaiModelName || "gpt-4o-mini",
-                            customPrompt: this.record.openaiCustomPrompt || ""
-                        });
 
                         w2popup.close();
                         w2alert("AI settings saved successfully.");
@@ -957,14 +982,7 @@
             });
         }
         else {
-            w2ui.aiSettings.record = {
-                geminiApiKey: maskedGeminiKey,
-                geminiModelName: geminiConfig.modelName || "gemini-2.0-flash",
-                geminiCustomPrompt: geminiConfig.customPrompt || "",
-                openaiApiKey: maskedOpenaiKey,
-                openaiModelName: openaiConfig.modelName || "gpt-4o-mini",
-                openaiCustomPrompt: openaiConfig.customPrompt || ""
-            };
+            w2ui.aiSettings.record = aiSettingsRecord;
             w2ui.aiSettings.refresh();
         }
 
@@ -1178,6 +1196,13 @@
         });
     }
 
+    function FormatLanguageColumnText(language, locale) {
+        var languageName = locale.language || language;
+        var localeCode = locale.code ? " (" + locale.code + ")" : "";
+
+        return languageName + localeCode + " (" + language + ")";
+    }
+
     TranslationHandler.FillLanguageCodes = function(languages, userSettings, config) {
         var grid = XrmTranslator.GetGrid();
         var languageCount = languages.length;
@@ -1195,9 +1220,10 @@
                 var locale = locales.find(function (l) { return l.localeid == language }) || {};
 
                 var editable = config.lockedLanguages && config.lockedLanguages.indexOf(language) !== -1 ? null : { type: 'text' };
+                var columnText = FormatLanguageColumnText(language, locale);
 
-                grid.addColumn({ field: language, text: `${locale.language || language} (${locale.code})`, size: columnWidth + "%", sortable: true, editable: editable });
-                grid.addSearch({ field: language, text: `${locale.language || language} (${locale.code})`, type: 'text' });
+                grid.addColumn({ field: language, text: columnText, size: columnWidth + "%", sortable: true, editable: editable });
+                grid.addSearch({ field: language, text: columnText, type: 'text' });
 
                 if (config.hideLanguagesByDefault && language !== userSettings.uilanguageid) {
                     grid.hideColumn(language);

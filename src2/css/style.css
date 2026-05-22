@@ -40,6 +40,23 @@
     background-size: 15px 15px !important;
 }
 
+.w2ui-tb-icon > span.icon-folder,
+.w2ui-tb-icon > span.icon-page,
+.w2ui-tb-icon > span.icon-funnel,
+.w2ui-tb-icon > span.icon-about,
+.w2ui-tb-icon > span.fa-camera,
+.w2ui-tb-icon > span.fa-picture,
+.w2ui-icon.icon-folder,
+.w2ui-icon.icon-page,
+.w2ui-icon.icon-funnel,
+.w2ui-icon.icon-about,
+.w2ui-icon.fa-camera,
+.w2ui-icon.fa-picture {
+    display: inline-block !important;
+    width: 16px !important;
+    height: 16px !important;
+}
+
 
 
 

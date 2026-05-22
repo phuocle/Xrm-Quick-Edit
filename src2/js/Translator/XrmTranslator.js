@@ -1075,7 +1075,13 @@
             height: 310,
             modal: true,
             showClose: true,
-            buttons: '<button class="w2ui-btn" onclick="w2popup.close();">Close</button>'
+            showMax: true,
+            buttons: '<button class="w2ui-btn" onclick="w2popup.close();">Close</button>',
+            onOpen: function (event) {
+                event.onComplete = function () {
+                    setTimeout(function () { w2popup.max(); }, 100);
+                };
+            }
         });
     }
 
@@ -1250,7 +1256,7 @@
             { type: 'button', id: 'load', text: 'Load', icon:'w2ui-icon-reload', onClick: LoadHandler },
             { type: 'spacer' },
             { type: 'break' },
-            { type: 'button', id: 'about', text: 'About', icon: 'w2ui-icon-info' },
+            { type: 'button', id: 'about', text: 'About', icon: 'icon-about' },
             { type: 'button', id: 'help', text: 'Help', icon:'w2ui-icon-info' }
         ];
 
@@ -1384,7 +1390,7 @@
         } });
 
         items.push({ type: 'break', id: 'break-filter' });
-        items.push({ type: 'check', id: 'filterUntranslated', icon: 'w2ui-icon-search', tooltip: 'Show only untranslated records', onClick: function () {
+        items.push({ type: 'check', id: 'filterUntranslated', icon: 'icon-funnel', tooltip: 'Show only untranslated records', onClick: function () {
             ToggleUntranslatedFilter();
         } });
 
@@ -1444,8 +1450,8 @@
         gridToolbar.insert('w2ui-reload', { type: 'menu', id: 'toggle', icon: 'icon-folder',
             text: "Toggle",
             items: [
-                { type: 'button', text: 'Expand all records', id: 'expandAll' },
-                { type: 'button', text: 'Collapse all records', id: 'collapseAll' }
+                { type: 'button', text: 'Expand all records', id: 'expandAll', icon: 'w2ui-icon-expand' },
+                { type: 'button', text: 'Collapse all records', id: 'collapseAll', icon: 'w2ui-icon-collapse' }
             ]
         });
         gridToolbar.insert('w2ui-reload', { type: 'break', id: 'break-toggle' });

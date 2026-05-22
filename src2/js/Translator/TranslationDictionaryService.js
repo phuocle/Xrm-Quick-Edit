@@ -525,7 +525,7 @@
             for (var i = 0; i < columns.length; i++) {
                 var column = columns[i];
                 if (String(column.field) === lookup) {
-                    return extractLanguageDisplayName(column.caption) || lookup;
+                    return extractLanguageDisplayName(column.text || column.caption || column.label) || lookup;
                 }
             }
         }
