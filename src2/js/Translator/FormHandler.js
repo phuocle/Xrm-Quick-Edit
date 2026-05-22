@@ -130,6 +130,10 @@
     }
 
     function AttachLabels(node, gridNode) {
+        if (!node) {
+            return;
+        }
+
         var labels = GetLabels(node);
 
         if (!labels) {
@@ -173,8 +177,8 @@
         AttachLabels(node, gridNode);
 
         for (var i = 0; i < FormHandler.selectedForms.length; i++) {
-            var node = GetById(node.id, FormHandler.selectedForms[i]);
-            AttachLabels(node, gridNode);
+            var translatedNode = GetById(node.id, FormHandler.selectedForms[i]);
+            AttachLabels(translatedNode, gridNode);
         }
 
         if (XrmTranslator.config.lockFormCells && name.toLowerCase() === "cell") {

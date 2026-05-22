@@ -21,6 +21,10 @@
         return !config.Behavior || config.Behavior === "UseCollectionName";
     }
 
+    function NormalizeLogicalName(name) {
+        return String(name || "").toLowerCase();
+    }
+
     function ApplyChanges(changes, labels) {
         for (var change in changes) {
             if (!changes.hasOwnProperty(change)) {
@@ -235,19 +239,32 @@
                 if (m.IsCustomizable && !m.IsCustomizable.Value) {
                     continue;
                 }
-                var mMenu = m.Entity1AssociatedMenuConfiguration || {};
+
+                var selectedEntity = NormalizeLogicalName(entityName);
+                var isEntity1Side = NormalizeLogicalName(m.Entity1LogicalName) === selectedEntity;
+                var isEntity2Side = NormalizeLogicalName(m.Entity2LogicalName) === selectedEntity;
+
+                if (!isEntity1Side && !isEntity2Side) {
+                    continue;
+                }
+
+                var menuConfigProperty = isEntity1Side
+                    ? "Entity1AssociatedMenuConfiguration"
+                    : "Entity2AssociatedMenuConfiguration";
+                var mMenu = m[menuConfigProperty] || {};
                 if (mMenu.IsCustomizable === false) {
                     continue;
                 }
-                var otherEntity = m.Entity2LogicalName;
+
+                var otherEntity = isEntity1Side ? m.Entity2LogicalName : m.Entity1LogicalName;
                 navEntityNames[otherEntity] = true;
                 allRels.push({
                     recid: m.MetadataId,
                     MetadataId: m.MetadataId,
                     SchemaName: m.SchemaName,
                     relType: "N:N \u2194 " + otherEntity,
-                    _menuConfig: m.Entity1AssociatedMenuConfiguration || {},
-                    _menuConfig2: m.Entity2AssociatedMenuConfiguration || {},
+                    _menuConfig: mMenu,
+                    _menuConfigProperty: menuConfigProperty,
                     _navEntity: otherEntity
                 });
             }
@@ -295,7 +312,7 @@
 
             var payload = { "@odata.type": odataType, SchemaName: update.SchemaName };
             if (update.relType.indexOf("N:N") === 0) {
-                payload.Entity1AssociatedMenuConfiguration = menuConfig;
+                payload[update._menuConfigProperty || "Entity1AssociatedMenuConfiguration"] = menuConfig;
             } else {
                 payload.AssociatedMenuConfiguration = menuConfig;
             }

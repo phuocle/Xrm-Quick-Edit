@@ -26,11 +26,22 @@
     "use strict";
 
     var locales = null;
-    var GEMINI_CONFIG_KEY = "XrmQuickEdit_GeminiConfig";
-    var OPENAI_CONFIG_KEY = "XrmQuickEdit_OpenAIConfig";
-    var TRANSLATION_PROMPT_KEY = "XrmQuickEdit_TranslationPrompt";
-    var OPENAI_ENABLED = false;
+    var GEMINI_CONFIG_KEY = "XrmQuickTranslate_GeminiConfig";
+    var OPENAI_CONFIG_KEY = "XrmQuickTranslate_OpenAIConfig";
+    var TRANSLATION_PROMPT_KEY = "XrmQuickTranslate_TranslationPrompt";
     var translationProviders = [];
+
+    function GetCurrentGridValue(record, lcid) {
+        if (!record) {
+            return "";
+        }
+
+        if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, lcid)) {
+            return record.w2ui.changes[lcid];
+        }
+
+        return record[lcid] || record[String(lcid)] || "";
+    }
 
     function GetSavedTranslationPrompt() {
         try {
@@ -92,6 +103,16 @@
         return defaultValue;
     }
 
+    function IsOpenAIEnabled() {
+        return typeof XrmTranslator !== "undefined" &&
+            XrmTranslator.config &&
+            normalizeBoolean(XrmTranslator.config.enableOpenAI, false);
+    }
+
+    function IsProviderEnabled(provider) {
+        return !provider.enabled || provider.enabled();
+    }
+
     function PostJson(url, headers, body) {
         return fetch(url, {
             method: "POST",
@@ -142,7 +163,7 @@
 
         for (var i = 0; i < translationProviders.length; i++) {
             var provider = translationProviders[i];
-            if (String(provider.id).toLowerCase() === normalized) {
+            if (IsProviderEnabled(provider) && String(provider.id).toLowerCase() === normalized) {
                 return provider;
             }
         }
@@ -151,11 +172,17 @@
     }
 
     function GetDefaultTranslationProvider() {
-        return translationProviders.length ? translationProviders[0] : null;
+        for (var i = 0; i < translationProviders.length; i++) {
+            if (IsProviderEnabled(translationProviders[i])) {
+                return translationProviders[i];
+            }
+        }
+
+        return null;
     }
 
     function GetTranslationProviderItems() {
-        return translationProviders.map(function(provider) {
+        return translationProviders.filter(IsProviderEnabled).map(function(provider) {
             return {
                 id: provider.id,
                 text: provider.text
@@ -344,25 +371,24 @@
         };
     };
 
-    if (OPENAI_ENABLED) {
-        RegisterTranslationProvider({
-            id: "openai",
-            text: "OpenAI",
-            validate: function() {
-                var openAIConfig = GetOpenAIConfig();
+    RegisterTranslationProvider({
+        id: "openai",
+        text: "OpenAI",
+        enabled: IsOpenAIEnabled,
+        validate: function() {
+            var openAIConfig = GetOpenAIConfig();
 
-                if (!openAIConfig || !openAIConfig.apiKey) {
-                    return "OpenAI: API Key is missing. Please configure it via AI Settings.";
-                }
-
-                return null;
-            },
-            create: function() {
-                var openAIConfig = GetOpenAIConfig();
-                return new openAITranslator(openAIConfig.apiKey, openAIConfig.modelName, openAIConfig.customPrompt);
+            if (!openAIConfig || !openAIConfig.apiKey) {
+                return "OpenAI: API Key is missing. Please configure it via AI Settings.";
             }
-        });
-    }
+
+            return null;
+        },
+        create: function() {
+            var openAIConfig = GetOpenAIConfig();
+            return new openAITranslator(openAIConfig.apiKey, openAIConfig.modelName, openAIConfig.customPrompt);
+        }
+    });
 
     TranslationHandler.ApplyTranslations = function (selected, results) {
         var grid = XrmTranslator.GetGrid();
@@ -584,17 +610,9 @@
 
         var useDictionaryEnabled = normalizeBoolean(useDictionaryFirst, true);
 
-        function getCurrentValue(record, lcid) {
-            if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, lcid)) {
-                return record.w2ui.changes[lcid];
-            }
-
-            return record[lcid] || record[String(lcid)];
-        }
-
         function shouldIncludeRecord(record, mode) {
-            var sourceVal = getCurrentValue(record, fromLcid);
-            var targetVal = getCurrentValue(record, destLcid);
+            var sourceVal = GetCurrentGridValue(record, fromLcid);
+            var targetVal = GetCurrentGridValue(record, destLcid);
 
             if (mode === "missing") {
                 return !targetVal;
@@ -645,11 +663,15 @@
                 var record = records[i];
 
                 // Skip records that have no source text
-                if (!record[fromLcid]) {
+                var sourceText = GetCurrentGridValue(record, fromLcid);
+                if (!sourceText) {
                     continue;
                 }
 
-                updateRecords.push(record);
+                var updateRecord = Object.assign({}, record);
+                updateRecord[fromLcid] = sourceText;
+                updateRecord[String(fromLcid)] = sourceText;
+                updateRecords.push(updateRecord);
             }
 
             if (updateRecords.length === 0) {
@@ -675,7 +697,7 @@
 
                 if (translator.GetBatchTranslations) {
                     var phrases = recordsForAi.map(function(record) {
-                        return w2utils.decodeTags(record[fromLcid]);
+                        return w2utils.decodeTags(GetCurrentGridValue(record, fromLcid));
                     });
 
                     return translator.GetBatchTranslations(fromIso, toIso, phrases)
@@ -696,8 +718,8 @@
                     const source = XrmTranslator.config.translationExceptions && XrmTranslator.config.translationExceptions.length
                     ? XrmTranslator.config.translationExceptions.reduce(function(all, cur) {
                         return (all || "").replace(new RegExp(cur, "gmi"), '<escape data="$1"/>')
-                    }, record[fromLcid])
-                    : record[fromLcid]
+                    }, GetCurrentGridValue(record, fromLcid))
+                    : GetCurrentGridValue(record, fromLcid)
 
                     translationRequests.push(translator.GetTranslation(fromIso, toIso, w2utils.decodeTags(source)));
                 }
@@ -824,8 +846,8 @@
                         var recordFilter = null;
                         if (translateMissingVal) {
                             recordFilter = function(record) {
-                                var targetVal = record[targetLcid] || record[String(targetLcid)];
-                                var sourceVal = record[sourceLcid] || record[String(sourceLcid)];
+                                var targetVal = GetCurrentGridValue(record, targetLcid);
+                                var sourceVal = GetCurrentGridValue(record, sourceLcid);
 
                                 if (translateMissingVal === "overwrite") {
                                     return true;
@@ -929,7 +951,7 @@
             geminiCustomPrompt: geminiConfig.customPrompt || ""
         };
 
-        if (OPENAI_ENABLED) {
+        if (IsOpenAIEnabled()) {
             aiSettingsTabs.push({ id: 'tab-openai', text: 'OpenAI' });
             aiSettingsFormHTML +=
                 '<div class="w2ui-page page-1" style="padding: 15px 25px;">'+
@@ -983,7 +1005,7 @@
                             customPrompt: this.record.geminiCustomPrompt || ""
                         });
 
-                        if (OPENAI_ENABLED) {
+                        if (IsOpenAIEnabled()) {
                             var currentOpenai = GetOpenAIConfig();
                             var openaiKeyToSave = this.record.openaiApiKey;
                             if (openaiKeyToSave && openaiKeyToSave.indexOf("*") !== -1 && currentOpenai && currentOpenai.apiKey) {

@@ -26,11 +26,9 @@
     "use strict";
 
     var BASE_SOLUTION_UNIQUE_NAME = "XrmQuickTranslate";
-    var LEGACY_BASE_SOLUTION_UNIQUE_NAME = "XrmQuickEdit";
     var DATA_SOLUTION_DISPLAY_NAME = "Xrm Quick Translate Data";
     var DATA_SOLUTION_UNIQUE_NAME = "XrmQuickTranslateData";
     var DICTIONARY_WEBRESOURCE_UNIQUE_NAME = "pl_/XrmQuickTranslate/data/TranslationDictionary.xml";
-    var LEGACY_DICTIONARY_WEBRESOURCE_UNIQUE_NAME = "oss_XrmQuickEdit/data/TranslationDictionary.xml";
     var DICTIONARY_WEBRESOURCE_DISPLAY_NAME = "Xrm Quick Translate Translation Dictionary";
     var DICTIONARY_WEBRESOURCE_DESCRIPTION = "Stores customer dictionary whitelist for Xrm Quick Translate translation.";
     var CACHE_KEY = "XrmQuickTranslate_DictionaryStorage_v1";
@@ -171,13 +169,6 @@
     function findBaseSolution() {
         return findBaseSolutionByName(BASE_SOLUTION_UNIQUE_NAME)
         .then(function (solution) {
-            if (solution) {
-                return solution;
-            }
-
-            return findBaseSolutionByName(LEGACY_BASE_SOLUTION_UNIQUE_NAME);
-        })
-        .then(function (solution) {
             if (!solution) {
                 throw new Error("Base solution " + BASE_SOLUTION_UNIQUE_NAME + " not found.");
             }
@@ -308,14 +299,7 @@
     }
 
     function findDictionaryWebResourceByName() {
-        return findWebResourceByName(DICTIONARY_WEBRESOURCE_UNIQUE_NAME)
-        .then(function (webResource) {
-            if (webResource) {
-                return webResource;
-            }
-
-            return findWebResourceByName(LEGACY_DICTIONARY_WEBRESOURCE_UNIQUE_NAME);
-        });
+        return findWebResourceByName(DICTIONARY_WEBRESOURCE_UNIQUE_NAME);
     }
 
     function getWebResourceById(webResourceId) {

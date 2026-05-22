@@ -69,13 +69,14 @@
     var baseLanguageScopeDepth = 0;
     var baseLanguageRestoreLcid = null;
     var unfilteredRecords = null;
+    var recordSelectorContext = null;
     var CONFIG_WEBRESOURCE_NAMES = [
-        "pl_/XrmQuickTranslate/config/XrmQuickTranslateConfig.js",
-        "oss_/XrmQuickEdit/config/XrmQuickEditConfig.js"
+        "pl_/XrmQuickTranslate/config/XrmQuickTranslateConfig.js"
     ];
     var DEFAULT_CONFIG = {
         entityWhitelist: [],
         entityWhiteList: [],
+        enableOpenAI: false,
         hideAutoTranslate: false,
         hideFindAndReplace: false,
         hideLanguagesByDefault: false,
@@ -742,6 +743,40 @@
         return r;
     }
 
+    function ResolveRecordSelectorCallback(callbackName) {
+        var parts = String(callbackName || "").split(".");
+        var context = window;
+
+        for (var i = 0; i < parts.length; i++) {
+            context = context[parts[i]];
+            if (!context) {
+                return null;
+            }
+        }
+
+        return typeof context === "function" ? context : null;
+    }
+
+    XrmTranslator.ApplyRecordSelectorSelection = function () {
+        var context = recordSelectorContext;
+        recordSelectorContext = null;
+
+        if (!context) {
+            w2popup.close();
+            return;
+        }
+
+        var callback = ResolveRecordSelectorCallback(context.callbackName);
+        var selectedRecords = XrmTranslator.GetManyByRecId(null, w2ui.recordSelectorGrid.getSelection());
+        var callbackParameters = context.callbackParameters || [];
+
+        w2popup.close();
+
+        if (callback) {
+            callback.apply(null, [selectedRecords].concat(callbackParameters));
+        }
+    };
+
     XrmTranslator.ShowRecordSelector = function (callbackName, callbackParameters, preselectedRecords, recordFilter) {
         if (!w2ui.recordSelectorGrid) {
             new w2grid({
@@ -827,12 +862,15 @@
         w2ui.recordSelectorGrid.add(filteredRecords);
         w2ui.recordSelectorGrid.refresh();
 
-        var callbackString = (callbackParameters || []).map(function(p) { return typeof(p) === "string" ? "'" + p + "'" : p + ""; }).join(",");
+        recordSelectorContext = {
+            callbackName: callbackName,
+            callbackParameters: callbackParameters || []
+        };
 
         w2popup.open({
             title   : 'Select Records',
             buttons   : '<button class="w2ui-btn" onclick="w2popup.close();">Cancel</button> '+
-                        '<button class="w2ui-btn" onclick="w2popup.close();' + callbackName + '(XrmTranslator.GetManyByRecId(null, w2ui.recordSelectorGrid.getSelection())' + (callbackString ? "," + callbackString : "") + ');">Ok</button>',
+                        '<button class="w2ui-btn" onclick="XrmTranslator.ApplyRecordSelectorSelection();">Ok</button>',
             width   : 900,
             height  : 600,
             showMax : true,
@@ -853,6 +891,9 @@
                         w2ui.recordSelectorGrid.selectAll();
                     }
                 };
+            },
+            onClose: function () {
+                recordSelectorContext = null;
             },
             onToggle: function (event) {
                 w2ui.recordSelectorGrid.box.style.display = 'none';
@@ -938,7 +979,11 @@
                 ],
                 actions: {
                     "ok": function () {
-                        this.validate();
+                        var errors = this.validate();
+                        if (errors.length > 0 || !this.record.column) {
+                            return;
+                        }
+
                         w2popup.close();
                         XrmTranslator.FindRecords(undefined, this.record.find, this.record.replace, this.record.regex, this.record.ignoreCase, this.record.column.id, this.record.column.text, this.record.selectRecords);
                     },
@@ -950,7 +995,13 @@
         }
         else {
             // Columns will be different when user switches to portal content snippet or back from it, we need to make sure columns always match current grid columns
-            w2ui.findAndReplace.fields[4].options.items = languageItems;
+            var columnField = w2ui.findAndReplace.fields.find(function (field) {
+                return field.field === "column";
+            });
+
+            if (columnField) {
+                columnField.options.items = languageItems;
+            }
 
             w2ui.findAndReplace.refresh();
         }
@@ -1148,9 +1199,9 @@
             '<hr style="margin: 8px 0; border: none; border-top: 1px solid #ddd;">' +
             '<b>AI Translate:</b>' +
             '<ul style="margin: 4px 0 12px 0; padding-left: 20px;">' +
-            '<li><b>Auto Translate</b> — Uses an AI provider (Gemini or OpenAI) to translate labels from a source language to a target language. ' +
-            'Configure API keys via <i>AI Settings</i>.</li>' +
-            '<li><b>AI Settings</b> — Configure API keys, model names, and custom prompts for Google Gemini and OpenAI providers. ' +
+            '<li><b>Auto Translate</b> — Uses Google Gemini by default, or another enabled provider, to translate labels from a source language to a target language. ' +
+            'Configure provider credentials via <i>AI Settings</i>.</li>' +
+            '<li><b>AI Settings</b> — Configure API keys, model names, and custom prompts for enabled providers. ' +
             'Settings are stored in your browser\'s localStorage.</li>' +
             '</ul>' +
             '<b>Dictionary:</b>' +

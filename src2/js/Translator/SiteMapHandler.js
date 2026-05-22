@@ -6,6 +6,10 @@
 
     function getDirectChildren(parent, tagName) {
         var results = [];
+        if (!parent) {
+            return results;
+        }
+
         for (var i = 0; i < parent.childNodes.length; i++) {
             var child = parent.childNodes[i];
             if (child.nodeType === 1 && child.nodeName === tagName) {
@@ -84,6 +88,52 @@
         return results;
     }
 
+    function findDirectChildById(parent, tagName, id) {
+        var children = getDirectChildren(parent, tagName);
+        for (var i = 0; i < children.length; i++) {
+            if (children[i].getAttribute("Id") === id) {
+                return children[i];
+            }
+        }
+
+        return null;
+    }
+
+    function findSiteMapNodeByCompositeId(doc, update) {
+        if (!update.compositeId) {
+            return null;
+        }
+
+        var parts = String(update.compositeId).split(idSeparator);
+        var area = findDirectChildById(doc.documentElement, "Area", parts[0]);
+        if (!area || update.nodeType === "Area") {
+            return area;
+        }
+
+        var group = findDirectChildById(area, "Group", parts[1]);
+        if (!group || update.nodeType === "Group") {
+            return group;
+        }
+
+        return findDirectChildById(group, "SubArea", parts[2]);
+    }
+
+    function findSiteMapNodeById(doc, update) {
+        var allNodes = doc.getElementsByTagName(update.nodeType);
+
+        for (var n = 0; n < allNodes.length; n++) {
+            if (allNodes[n].getAttribute("Id") === update.id) {
+                return allNodes[n];
+            }
+        }
+
+        return null;
+    }
+
+    function findSiteMapNode(doc, update) {
+        return findSiteMapNodeByCompositeId(doc, update) || findSiteMapNodeById(doc, update);
+    }
+
     function ApplyXmlUpdates(xmlString, updates) {
         var parser = new DOMParser();
         var doc = parser.parseFromString(xmlString, "text/xml");
@@ -92,15 +142,7 @@
 
         for (var u = 0; u < updates.length; u++) {
             var update = updates[u];
-            var allNodes = doc.getElementsByTagName(update.nodeType);
-            var node = null;
-
-            for (var n = 0; n < allNodes.length; n++) {
-                if (allNodes[n].getAttribute("Id") === update.id) {
-                    node = allNodes[n];
-                    break;
-                }
-            }
+            var node = findSiteMapNode(doc, update);
             if (!node) {
                 continue;
             }
@@ -426,6 +468,7 @@
             if (labels.length > 0) {
                 updates.push({
                     id: nodeInfo ? nodeInfo.id : nodeId,
+                    compositeId: nodeInfo ? nodeInfo.compositeId : nodeId,
                     nodeType: nodeInfo ? nodeInfo.nodeType : "SubArea",
                     labels: labels
                 });
