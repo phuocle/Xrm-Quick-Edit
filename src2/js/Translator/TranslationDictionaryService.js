@@ -25,13 +25,15 @@
 (function (TranslationDictionaryService, undefined) {
     "use strict";
 
-    var BASE_SOLUTION_UNIQUE_NAME = "XrmQuickEdit";
+    var BASE_SOLUTION_UNIQUE_NAME = "XrmQuickTranslate";
+    var LEGACY_BASE_SOLUTION_UNIQUE_NAME = "XrmQuickEdit";
     var DATA_SOLUTION_DISPLAY_NAME = "Xrm Quick Translate Data";
-    var DATA_SOLUTION_UNIQUE_NAME = "XrmQuickEditData";
-    var DICTIONARY_WEBRESOURCE_UNIQUE_NAME = "oss_XrmQuickEdit/data/TranslationDictionary.xml";
+    var DATA_SOLUTION_UNIQUE_NAME = "XrmQuickTranslateData";
+    var DICTIONARY_WEBRESOURCE_UNIQUE_NAME = "pl_/XrmQuickTranslate/data/TranslationDictionary.xml";
+    var LEGACY_DICTIONARY_WEBRESOURCE_UNIQUE_NAME = "oss_XrmQuickEdit/data/TranslationDictionary.xml";
     var DICTIONARY_WEBRESOURCE_DISPLAY_NAME = "Xrm Quick Translate Translation Dictionary";
     var DICTIONARY_WEBRESOURCE_DESCRIPTION = "Stores customer dictionary whitelist for Xrm Quick Translate translation.";
-    var CACHE_KEY = "XrmQuickEdit_DictionaryStorage_v1";
+    var CACHE_KEY = "XrmQuickTranslate_DictionaryStorage_v1";
 
     var storageInfo = null;
     var initPromise = null;
@@ -152,17 +154,35 @@
         ].join("\n");
     }
 
-    function findBaseSolution() {
+    function findBaseSolutionByName(solutionUniqueName) {
         return WebApiClient.Retrieve({
             entityName: "solution",
-            queryParams: "?$select=solutionid,uniquename,friendlyname,_publisherid_value&$filter=uniquename eq '" + BASE_SOLUTION_UNIQUE_NAME + "'"
+            queryParams: "?$select=solutionid,uniquename,friendlyname,_publisherid_value&$filter=uniquename eq '" + escapeODataString(solutionUniqueName) + "'"
         })
         .then(function (response) {
-            if (!response || !response.value || response.value.length === 0) {
+            if (response && response.value && response.value.length > 0) {
+                return response.value[0];
+            }
+
+            return null;
+        });
+    }
+
+    function findBaseSolution() {
+        return findBaseSolutionByName(BASE_SOLUTION_UNIQUE_NAME)
+        .then(function (solution) {
+            if (solution) {
+                return solution;
+            }
+
+            return findBaseSolutionByName(LEGACY_BASE_SOLUTION_UNIQUE_NAME);
+        })
+        .then(function (solution) {
+            if (!solution) {
                 throw new Error("Base solution " + BASE_SOLUTION_UNIQUE_NAME + " not found.");
             }
 
-            return response.value[0];
+            return solution;
         });
     }
 
@@ -284,6 +304,17 @@
             }
 
             return null;
+        });
+    }
+
+    function findDictionaryWebResourceByName() {
+        return findWebResourceByName(DICTIONARY_WEBRESOURCE_UNIQUE_NAME)
+        .then(function (webResource) {
+            if (webResource) {
+                return webResource;
+            }
+
+            return findWebResourceByName(LEGACY_DICTIONARY_WEBRESOURCE_UNIQUE_NAME);
         });
     }
 
@@ -1028,7 +1059,7 @@
             logDebug("loadDictionaryModel:storage", info);
 
             // Always use fixed dictionary webresource name as source of truth.
-            return findWebResourceByName(DICTIONARY_WEBRESOURCE_UNIQUE_NAME)
+            return findDictionaryWebResourceByName()
             .then(function (webResourceByName) {
                 if (!webResourceByName) {
                     logWarn("Dictionary webresource not found by fixed name.", DICTIONARY_WEBRESOURCE_UNIQUE_NAME);
@@ -1119,7 +1150,7 @@
                 return WebApiClient.Execute(request);
             }
 
-            return findWebResourceByName(DICTIONARY_WEBRESOURCE_UNIQUE_NAME)
+            return findDictionaryWebResourceByName()
             .then(function (webResourceByName) {
                 if (!webResourceByName) {
                     throw new Error("Dictionary webresource not found by fixed name: " + DICTIONARY_WEBRESOURCE_UNIQUE_NAME);

@@ -1159,8 +1159,8 @@
             'When <i>Use Dictionary as First Priority</i> is enabled in Auto Translate, dictionary matches are applied before calling the AI provider.</li>' +
             '<li><b>Apply Dictionary</b> — Batch-apply existing dictionary entries to all matching records in the current grid without calling AI. ' +
             'Supports three modes: <i>All Overwrite</i>, <i>All Missing</i>, <i>All Missing Or Identical</i>.</li>' +
-            '<li><b>Storage:</b> Dictionary data is saved as a web resource (<code>oss_XrmQuickEdit/data/TranslationDictionary.xml</code>) ' +
-            'inside an unmanaged solution named <b>Xrm Quick Translate Data</b> (unique name: <code>XrmQuickEditData</code>). ' +
+            '<li><b>Storage:</b> Dictionary data is saved as a web resource (<code>pl_/XrmQuickTranslate/data/TranslationDictionary.xml</code>) ' +
+            'inside an unmanaged solution named <b>Xrm Quick Translate Data</b> (unique name: <code>XrmQuickTranslateData</code>). ' +
             'This solution is auto-created on first use.</li>' +
             '</ul>' +
             '</div>';
