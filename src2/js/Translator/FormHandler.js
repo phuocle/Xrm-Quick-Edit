@@ -384,6 +384,43 @@
         return "?$filter=objecttypecode eq '" + entityName.toLowerCase() + "' and iscustomizable/Value eq true and formactivationstate eq 1 and type ne 0 and type ne 10";
     }
 
+    function GetSelectedSolutionFormIds() {
+        var solutionId = XrmTranslator.GetSolution();
+
+        if (!solutionId || solutionId === "all") {
+            return WebApiClient.Promise.resolve([]);
+        }
+
+        return WebApiClient.Retrieve({
+            entityName: "solutioncomponent",
+            queryParams: "?$select=objectid&$filter=_solutionid_value eq " + solutionId + " and componenttype eq " + XrmTranslator.ComponentType.SystemForm
+        })
+        .then(function(response) {
+            return (response.value || []).map(function(component) {
+                return component.objectid;
+            });
+        });
+    }
+
+    function GetFormQueryForLoad(entityName) {
+        if (!IsDashboardMode()) {
+            return WebApiClient.Promise.resolve(GetFormQuery(entityName));
+        }
+
+        return GetSelectedSolutionFormIds()
+        .then(function(formIds) {
+            if (formIds.length === 0) {
+                return null;
+            }
+
+            var idFilter = formIds.map(function(id) {
+                return "formid eq " + id;
+            }).join(" or ");
+
+            return "?$filter=formactivationstate eq 1 and iscustomizable/Value eq true and (type eq 0 or type eq 10) and (" + idFilter + ")";
+        });
+    }
+
     function GetFormDisplayText(form, formTypeMap) {
         var formTypeName = formTypeMap[form.type] || ("Type " + form.type);
         var name = GetCleanText(form.name) || GetCleanText(form.objecttypecode) || "Unnamed Form";
@@ -406,62 +443,72 @@
             12: "Card"
         };
 
-        var query = GetFormQuery(entityName);
+        return GetFormQueryForLoad(entityName)
+        .then(function(query) {
+            if (!query) {
+                if (IsDashboardMode()) {
+                    return [];
+                }
 
-        if (!query) {
-            XrmTranslator.UnlockGrid();
-            return DialogHelper.alert("Please select an entity before loading forms.");
-        }
+                XrmTranslator.UnlockGrid();
+                return DialogHelper.alert("Please select an entity before loading forms.");
+            }
 
-        var formRequest = {
-            entityName: "systemform",
-            queryParams: query
-        };
+            var formRequest = {
+                entityName: "systemform",
+                queryParams: query
+            };
 
-        var languages = XrmTranslator.installedLanguages.LocaleIds;
-        var initialLanguage = XrmTranslator.userSettings.uilanguageid;
-        var requests = [];
+            var languages = XrmTranslator.installedLanguages.LocaleIds;
+            var initialLanguage = XrmTranslator.userSettings.uilanguageid;
+            var requests = [];
 
-        for (var i = 0; i < languages.length; i++) {
+            for (var i = 0; i < languages.length; i++) {
+                requests.push({
+                    action: "Update",
+                    language: languages[i]
+                });
+
+                requests.push({
+                    action: "Retrieve",
+                    language: languages[i]
+                });
+            }
+
             requests.push({
                 action: "Update",
-                language: languages[i]
+                language: initialLanguage
             });
 
-            requests.push({
-                action: "Retrieve",
-                language: languages[i]
-            });
-        }
-
-        requests.push({
-            action: "Update",
-            language: initialLanguage
-        });
-
-        return WebApiClient.Promise.reduce(requests, function(total, request){
-            if (request.action === "Update") {
-                return WebApiClient.Update({
-                    overriddenSetName: "usersettingscollection",
-                    entityId: XrmTranslator.userId,
-                    entity: { uilanguageid: request.language }
-                })
-                .then(function(response) {
-                    return total;
-                });
-            }
-            else if (request.action === "Retrieve") {
-                return WebApiClient.Promise.props({
-                    forms: WebApiClient.Retrieve(formRequest),
-                    languageCode: request.language
-                })
-                .then(function (response) {
-                    total.push(response);
-                    return total;
-                });
-            }
-        }, [])
+            return WebApiClient.Promise.reduce(requests, function(total, request){
+                if (request.action === "Update") {
+                    return WebApiClient.Update({
+                        overriddenSetName: "usersettingscollection",
+                        entityId: XrmTranslator.userId,
+                        entity: { uilanguageid: request.language }
+                    })
+                    .then(function(response) {
+                        return total;
+                    });
+                }
+                else if (request.action === "Retrieve") {
+                    return WebApiClient.Promise.props({
+                        forms: WebApiClient.Retrieve(formRequest),
+                        languageCode: request.language
+                    })
+                    .then(function (response) {
+                        total.push(response);
+                        return total;
+                    });
+                }
+            }, []);
+        })
         .then(function(responses) {
+            if (!responses || responses.length === 0) {
+                FormHandler.formsByLanguage = [];
+                return [];
+            }
+
             FormHandler.formsByLanguage = responses;
 
             // Process all forms and return per-form data

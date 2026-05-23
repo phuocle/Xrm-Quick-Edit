@@ -139,14 +139,44 @@
         grid.unlock();
     }
 
-    GlobalOptionSetHandler.Load = function () {
-        var url = WebApiClient.GetApiUrl() + "GlobalOptionSetDefinitions";
+    function GetSelectedSolutionOptionSetIds() {
+        var solutionId = XrmTranslator.GetSolution();
 
+        if (!solutionId || solutionId === "all") {
+            return WebApiClient.Promise.resolve([]);
+        }
+
+        return WebApiClient.Retrieve({
+            entityName: "solutioncomponent",
+            queryParams: "?$select=objectid&$filter=_solutionid_value eq " + solutionId + " and componenttype eq " + XrmTranslator.ComponentType.OptionSet
+        })
+        .then(function(response) {
+            return (response.value || []).map(function(component) {
+                return component.objectid;
+            });
+        });
+    }
+
+    function RetrieveGlobalOptionSet(optionSetId) {
+        var url = WebApiClient.GetApiUrl() + "GlobalOptionSetDefinitions(" + optionSetId + ")";
         return WebApiClient.SendRequest("GET", url)
-            .then(function (response) {
-                var parsed = typeof response === "string" ? JSON.parse(response) : response;
-                var optionSets = parsed.value.filter(function (os) {
-                    return os.IsCustomizable && os.IsCustomizable.Value && os.IsGlobal;
+        .then(function(response) {
+            return typeof response === "string" ? JSON.parse(response) : response;
+        });
+    }
+
+    GlobalOptionSetHandler.Load = function () {
+        return GetSelectedSolutionOptionSetIds()
+            .then(function(optionSetIds) {
+                if (optionSetIds.length === 0) {
+                    return [];
+                }
+
+                return WebApiClient.Promise.all(optionSetIds.map(RetrieveGlobalOptionSet));
+            })
+            .then(function (optionSets) {
+                optionSets = optionSets.filter(function (os) {
+                    return os && os.IsCustomizable && os.IsCustomizable.Value && os.IsGlobal;
                 });
 
                 optionSets.sort(function (a, b) {

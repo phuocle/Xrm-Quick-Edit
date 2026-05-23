@@ -666,6 +666,10 @@
             onOpen  : function (event) {
                 event.onComplete = function () {
                     w2ui.translationResultGrid.render('#w2ui-popup #main');
+                    setTimeout(function () {
+                        w2popup.max();
+                        w2ui.translationResultGrid.resize();
+                    }, 100);
                 };
             },
             onToggle: function (event) {

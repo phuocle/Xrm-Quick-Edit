@@ -1392,6 +1392,10 @@
                 event.onComplete = function () {
                     w2ui.recordSelectorGrid.render('#w2ui-popup #main');
                     w2ui.recordSelectorGrid.records.slice().forEach(function(r) { w2ui.recordSelectorGrid.expand(r.recid); });
+                    setTimeout(function () {
+                        w2popup.max();
+                        w2ui.recordSelectorGrid.resize();
+                    }, 100);
 
                     if (selectAllOnly) {
                         return;

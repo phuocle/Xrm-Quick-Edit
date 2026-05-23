@@ -1,7 +1,7 @@
 (function (SiteMapHandler, undefined) {
     "use strict";
 
-    var siteMapData = null; // selected sitemap data
+    var siteMapData = [];
     var idSeparator = "|";
 
     function getDirectChildren(parent, tagName) {
@@ -183,47 +183,71 @@
         return serializer.serializeToString(doc);
     }
 
+    function getSiteMapRecordId(sitemapId, compositeId) {
+        return sitemapId + idSeparator + compositeId;
+    }
+
+    function FillSiteMapNodeRecord(record, node, component) {
+        var labels = component === "DisplayName" ? node.titles : node.descriptions;
+        if (labels && labels.length > 0) {
+            for (var l = 0; l < labels.length; l++) {
+                record[labels[l].lcid] = labels[l].text;
+            }
+        } else if (component === "DisplayName" && node.entityLabels) {
+            var installedLangs = XrmTranslator.installedLanguages.LocaleIds;
+            for (var il = 0; il < installedLangs.length; il++) {
+                var langStr = installedLangs[il].toString();
+                if (node.entityLabels[langStr]) {
+                    record[langStr] = node.entityLabels[langStr];
+                }
+            }
+        } else if (component === "DisplayName" && node.defaultTitle) {
+            var defaultLangs = XrmTranslator.installedLanguages.LocaleIds;
+            for (var dl = 0; dl < defaultLangs.length; dl++) {
+                record[defaultLangs[dl].toString()] = node.defaultTitle;
+            }
+        }
+    }
+
     function FillTable() {
         var grid = XrmTranslator.GetGrid();
         grid.clear();
         var records = [];
         var component = XrmTranslator.GetComponent();
 
-        if (!siteMapData) {
+        if (!siteMapData || siteMapData.length === 0) {
             grid.unlock();
             return;
         }
 
-        var nodes = siteMapData.nodes || [];
-
-        for (var n = 0; n < nodes.length; n++) {
-            var node = nodes[n];
-            var record = {
-                recid: node.compositeId,
-                schemaName: "[" + node.type + "] " + node.id + (node.entity ? " (" + node.entity + ")" : "")
+        for (var sm = 0; sm < siteMapData.length; sm++) {
+            var currentSiteMap = siteMapData[sm];
+            var parent = {
+                recid: currentSiteMap.sitemapid,
+                schemaName: GetSiteMapDisplayName(currentSiteMap),
+                _isGroupNode: true,
+                w2ui: {
+                    editable: false,
+                    children: []
+                }
             };
 
-            var labels = component === "DisplayName" ? node.titles : node.descriptions;
-            if (labels && labels.length > 0) {
-                for (var l = 0; l < labels.length; l++) {
-                    record[labels[l].lcid] = labels[l].text;
-                }
-            } else if (component === "DisplayName" && node.entityLabels) {
-                var installedLangs = XrmTranslator.installedLanguages.LocaleIds;
-                for (var il = 0; il < installedLangs.length; il++) {
-                    var langStr = installedLangs[il].toString();
-                    if (node.entityLabels[langStr]) {
-                        record[langStr] = node.entityLabels[langStr];
-                    }
-                }
-            } else if (component === "DisplayName" && node.defaultTitle) {
-                var installedLangs = XrmTranslator.installedLanguages.LocaleIds;
-                for (var il = 0; il < installedLangs.length; il++) {
-                    record[installedLangs[il].toString()] = node.defaultTitle;
-                }
+            var nodes = currentSiteMap.nodes || [];
+
+            for (var n = 0; n < nodes.length; n++) {
+                var node = nodes[n];
+                var record = {
+                    recid: getSiteMapRecordId(currentSiteMap.sitemapid, node.compositeId),
+                    schemaName: "[" + node.type + "] " + node.id + (node.entity ? " (" + node.entity + ")" : ""),
+                    _siteMapId: currentSiteMap.sitemapid,
+                    _siteMapCompositeId: node.compositeId
+                };
+
+                FillSiteMapNodeRecord(record, node, component);
+                parent.w2ui.children.push(record);
             }
 
-            records.push(record);
+            records.push(parent);
         }
 
         XrmTranslator.AddSummary(records);
@@ -231,54 +255,49 @@
         grid.unlock();
     }
 
-    function ProcessSelection(sitemapId, sitemaps) {
-        var sm = null;
-        for (var i = 0; i < sitemaps.length; i++) {
-            if (sitemaps[i].sitemapid === sitemapId) {
-                sm = sitemaps[i];
-                break;
-            }
-        }
-
-        if (!sm || !sm.sitemapxml) {
-            XrmTranslator.UnlockGrid();
-            return;
-        }
-
-        var nodes = [];
-        try {
-            nodes = ParseSiteMapXml(sm.sitemapxml);
-        } catch (e) {
-            // Skip unparseable sitemaps
-        }
-
-        siteMapData = {
-            sitemapid: sm.sitemapid,
-            sitemapname: sm.sitemapname,
-            sitemapxml: sm.sitemapxml,
-            nodes: nodes
-        };
-
-        SiteMapHandler.lastId = sitemapId;
-
-        // Collect unique entity names from SubAreas to fetch display names
+    function BuildSiteMapData(sitemaps) {
+        var parsedSitemaps = [];
         var entityNames = [];
-        for (var n = 0; n < nodes.length; n++) {
-            if (nodes[n].entity && entityNames.indexOf(nodes[n].entity) === -1) {
-                entityNames.push(nodes[n].entity);
+
+        for (var i = 0; i < sitemaps.length; i++) {
+            var sm = sitemaps[i];
+            if (!sm || !sm.sitemapxml) {
+                continue;
             }
+
+            var nodes = [];
+            try {
+                nodes = ParseSiteMapXml(sm.sitemapxml);
+            } catch (e) {
+                continue;
+            }
+
+            for (var n = 0; n < nodes.length; n++) {
+                if (nodes[n].entity && entityNames.indexOf(nodes[n].entity) === -1) {
+                    entityNames.push(nodes[n].entity);
+                }
+            }
+
+            parsedSitemaps.push({
+                sitemapid: sm.sitemapid,
+                sitemapname: sm.sitemapname,
+                sitemapxml: sm.sitemapxml,
+                nodes: nodes
+            });
         }
+
+        siteMapData = parsedSitemaps;
 
         if (entityNames.length === 0) {
             FillTable();
-            return;
+            return WebApiClient.Promise.resolve();
         }
 
         var filterParts = entityNames.map(function (name) {
             return "LogicalName eq '" + name + "'";
         });
 
-        WebApiClient.Retrieve({
+        return WebApiClient.Retrieve({
             overriddenSetName: "EntityDefinitions",
             queryParams: "?$select=LogicalName,DisplayName&$filter=" + filterParts.join(" or ")
         })
@@ -297,10 +316,12 @@
                 }
             }
 
-            for (var i = 0; i < siteMapData.nodes.length; i++) {
-                var node = siteMapData.nodes[i];
-                if (node.entity && entityMap[node.entity]) {
-                    node.entityLabels = entityMap[node.entity];
+            for (var sm = 0; sm < siteMapData.length; sm++) {
+                for (var i = 0; i < siteMapData[sm].nodes.length; i++) {
+                    var node = siteMapData[sm].nodes[i];
+                    if (node.entity && entityMap[node.entity]) {
+                        node.entityLabels = entityMap[node.entity];
+                    }
                 }
             }
 
@@ -361,76 +382,8 @@
             "Unnamed SiteMap";
     }
 
-    function ShowSiteMapSelection(sitemaps) {
-        if (!w2ui.siteMapSelectionPrompt) {
-            new w2form({
-                name: 'siteMapSelectionPrompt',
-                style: 'border: 0px; background-color: transparent;',
-                formHTML:
-                    '<div class="w2ui-page page-0 xqt-sitemap-selection-form">' +
-                    '    <div class="xqt-sitemap-selection-row">' +
-                    '        <label class="xqt-sitemap-selection-label" for="siteMapSelection">SiteMap: <span class="xqt-required">*</span></label>' +
-                    '        <div class="xqt-sitemap-selection-control"><input name="siteMapSelection" type="list" /></div>' +
-                    '    </div>' +
-                    '</div>' +
-                    '<div class="w2ui-buttons">' +
-                    '    <button class="w2ui-btn" name="cancel">Cancel</button>' +
-                    '    <button class="w2ui-btn" name="ok">Ok</button>' +
-                    '</div>',
-                fields: [
-                    { field: 'siteMapSelection', type: 'list', required: true }
-                ],
-                actions: {
-                    "ok": function () {
-                        var errors = this.validate();
-                        if (errors.length > 0 || !this.record.siteMapSelection) {
-                            return;
-                        }
-                        ProcessSelection(this.record.siteMapSelection.id, SiteMapHandler._sitemaps);
-                        w2popup.close();
-                    },
-                    "cancel": function () {
-                        XrmTranslator.UnlockGrid();
-                        w2popup.close();
-                    }
-                }
-            });
-        }
-
-        var items = [];
-        for (var i = 0; i < sitemaps.length; i++) {
-            items.push({
-                id: sitemaps[i].sitemapid,
-                text: GetSiteMapDisplayName(sitemaps[i])
-            });
-        }
-
-        SiteMapHandler._sitemaps = sitemaps;
-        w2ui.siteMapSelectionPrompt.record.siteMapSelection = null;
-        w2ui.siteMapSelectionPrompt.fields[0].options = { items: items };
-
-        w2popup.open({
-            title: 'Choose SiteMap',
-            name: 'siteMapSelectionPopup',
-            body: '<div id="form" class="xqt-sitemap-selection-popup-form"></div>',
-            style: 'padding: 0px; overflow-x: hidden;',
-            width: 650,
-            height: 220,
-            showMax: false,
-            onOpen: function (event) {
-                event.onComplete = function () {
-                    w2ui.siteMapSelectionPrompt.render('#w2ui-popup #form');
-                    w2ui.siteMapSelectionPrompt.resize();
-                };
-            },
-            onClose: function () {
-                XrmTranslator.UnlockGrid();
-            }
-        });
-    }
-
     SiteMapHandler.Load = function () {
-        siteMapData = null;
+        siteMapData = [];
         SiteMapHandler.lastId = null;
 
         var solutionId = XrmTranslator.GetSolution();
@@ -457,10 +410,8 @@
             });
         } else {
             // No solution selected — load all sitemaps
-            sitemapPromise = WebApiClient.Retrieve({
-                entityName: "sitemap",
-                queryParams: "?$select=sitemapid,sitemapname,sitemapxml"
-            });
+            XrmTranslator.UnlockGrid();
+            return DialogHelper.alert("Please select a solution before loading sitemaps.");
         }
 
         return sitemapPromise
@@ -472,42 +423,66 @@
                     return DialogHelper.alert("No sitemaps found" + (solutionId && solutionId !== "all" ? " in the selected solution." : "."));
                 }
 
-                ShowSiteMapSelection(sitemaps);
+                return BuildSiteMapData(sitemaps);
             })
             .catch(XrmTranslator.errorHandler);
     };
 
+    function GetLoadedSiteMapData(siteMapId) {
+        for (var i = 0; i < siteMapData.length; i++) {
+            if (siteMapData[i].sitemapid === siteMapId) {
+                return siteMapData[i];
+            }
+        }
+
+        return null;
+    }
+
+    function GetLoadedSiteMapNode(siteMap, compositeId) {
+        if (!siteMap || !siteMap.nodes) {
+            return null;
+        }
+
+        for (var i = 0; i < siteMap.nodes.length; i++) {
+            if (siteMap.nodes[i].compositeId === compositeId) {
+                return siteMap.nodes[i];
+            }
+        }
+
+        return null;
+    }
+
     SiteMapHandler.Save = function () {
         XrmTranslator.LockGrid("Saving");
 
-        if (!siteMapData) {
+        if (!siteMapData || siteMapData.length === 0) {
             XrmTranslator.UnlockGrid();
             return;
         }
 
-        var records = XrmTranslator.GetGrid().records;
-        var updates = [];
+        var records = XrmTranslator.GetAllRecords();
+        var updatesBySiteMap = {};
+        var processedRecords = {};
 
         for (var i = 0; i < records.length; i++) {
             var record = records[i];
-            if (!record.w2ui || !record.w2ui.changes) {
+            if (!record._siteMapId || !record.w2ui || !record.w2ui.changes || processedRecords[record.recid]) {
                 continue;
             }
 
-            var nodeId = record.recid;
-            var nodeInfo = null;
-            for (var y = 0; y < siteMapData.nodes.length; y++) {
-                if (siteMapData.nodes[y].compositeId === nodeId) {
-                    nodeInfo = siteMapData.nodes[y];
-                    break;
-                }
+            processedRecords[record.recid] = true;
+
+            var siteMap = GetLoadedSiteMapData(record._siteMapId);
+            var nodeInfo = GetLoadedSiteMapNode(siteMap, record._siteMapCompositeId);
+            if (!siteMap || !nodeInfo) {
+                continue;
             }
 
             var changes = record.w2ui.changes;
             var installedLangs = XrmTranslator.installedLanguages.LocaleIds;
             var labels = [];
 
-            // Include all language values (original + changed) so defaults are saved too
+            // Include all language values (original + changed) so defaults are saved too.
             for (var il = 0; il < installedLangs.length; il++) {
                 var lang = installedLangs[il].toString();
                 var text = changes.hasOwnProperty(lang) ? changes[lang] : record[lang];
@@ -517,31 +492,50 @@
             }
 
             if (labels.length > 0) {
-                updates.push({
-                    id: nodeInfo ? nodeInfo.id : nodeId,
-                    compositeId: nodeInfo ? nodeInfo.compositeId : nodeId,
-                    nodeType: nodeInfo ? nodeInfo.nodeType : "SubArea",
+                if (!updatesBySiteMap[siteMap.sitemapid]) {
+                    updatesBySiteMap[siteMap.sitemapid] = [];
+                }
+
+                updatesBySiteMap[siteMap.sitemapid].push({
+                    id: nodeInfo.id,
+                    compositeId: nodeInfo.compositeId,
+                    nodeType: nodeInfo.nodeType,
                     labels: labels
                 });
             }
         }
 
-        if (updates.length === 0) {
+        var updatedSiteMapIds = Object.keys(updatesBySiteMap);
+        if (updatedSiteMapIds.length === 0) {
             XrmTranslator.UnlockGrid();
             return;
         }
 
-        var updatedXml = ApplyXmlUpdates(siteMapData.sitemapxml, updates);
+        var saveChain = WebApiClient.Promise.resolve();
 
-        XrmTranslator.LockGridProgress("Saving sitemap", 1, 1);
+        for (var s = 0; s < updatedSiteMapIds.length; s++) {
+            (function(siteMapId, index) {
+                saveChain = saveChain.then(function() {
+                    var currentSiteMap = GetLoadedSiteMapData(siteMapId);
+                    var updatedXml = ApplyXmlUpdates(currentSiteMap.sitemapxml, updatesBySiteMap[siteMapId]);
 
-        return WebApiClient.Update({
-            entityName: "sitemap",
-            entityId: siteMapData.sitemapid,
-            entity: {
-                sitemapxml: updatedXml
-            }
-        })
+                    XrmTranslator.LockGridProgress("Saving sitemaps", index + 1, updatedSiteMapIds.length);
+
+                    return WebApiClient.Update({
+                        entityName: "sitemap",
+                        entityId: currentSiteMap.sitemapid,
+                        entity: {
+                            sitemapxml: updatedXml
+                        }
+                    })
+                    .then(function() {
+                        currentSiteMap.sitemapxml = updatedXml;
+                    });
+                });
+            })(updatedSiteMapIds[s], s);
+        }
+
+        return saveChain
         .then(function () {
             XrmTranslator.LockGrid("Publishing");
             return XrmTranslator.RunAsBaseLanguage(function () {
@@ -550,26 +544,13 @@
         })
         .then(function () {
             return XrmTranslator.AddToSolution(
-                [siteMapData.sitemapid],
+                updatedSiteMapIds,
                 XrmTranslator.ComponentType.SiteMap
             );
         })
         .then(function () {
             XrmTranslator.LockGrid("Reloading");
-
-            // Reload the same sitemap by id to avoid GUID filter formatting issues.
-            return WebApiClient.Retrieve({
-                entityName: "sitemap",
-                entityId: siteMapData.sitemapid,
-                queryParams: "?$select=sitemapid,sitemapname,sitemapxml"
-            })
-            .then(function (response) {
-                if (response && response.sitemapid) {
-                    ProcessSelection(response.sitemapid, [response]);
-                } else {
-                    XrmTranslator.UnlockGrid();
-                }
-            });
+            return SiteMapHandler.Load();
         })
         .catch(XrmTranslator.errorHandler);
     };
