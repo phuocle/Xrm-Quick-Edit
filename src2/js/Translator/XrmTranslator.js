@@ -44,8 +44,6 @@
 
     XrmTranslator.defaultSchemaNameSize = "20%";
 
-    // Toggle quick DEBUG autofill button in toolbar (true = show, false = hide).
-    XrmTranslator.showDebugButton = true;
     XrmTranslator.showAllInOneType = true;
 
     XrmTranslator.LockGridProgress = function (label, current, total) {
@@ -223,6 +221,77 @@
                 }
             }
         }
+    }
+
+    function HasSelectedSolution() {
+        var solutionId = XrmTranslator.GetSolution();
+        return !!solutionId && solutionId !== "all";
+    }
+
+    function IsDebugToolbarEnabled() {
+        try {
+            return sessionStorage.getItem("XrmQuickTranslateDebug") === "true";
+        }
+        catch (e) {
+            return false;
+        }
+    }
+
+    function SetToolbarItemsEnabled(ids, enabled) {
+        var toolbar = GetToolbar();
+        if (!toolbar) {
+            return;
+        }
+
+        for (var i = 0; i < ids.length; i++) {
+            if (!toolbar.get(ids[i])) {
+                continue;
+            }
+
+            if (enabled) {
+                toolbar.enable(ids[i]);
+            } else {
+                toolbar.disable(ids[i]);
+            }
+        }
+    }
+
+    function ApplyTypeVisibilityForEntity(entityTarget) {
+        if (entityTarget === "entitySelect:none" || entityTarget === "none") {
+            SetToolbarItemsVisible(ENTITY_DEPENDENT_TYPE_ITEMS, false);
+            SetToolbarItemsVisible(GLOBAL_TYPE_ITEMS, true);
+
+            if (["allInOne", "attributes", "options", "forms", "views", "formMeta", "entityMeta", "relationships", "charts", "bpf", "content"].indexOf(GetToolbar().get("type").selected) !== -1) {
+                GetToolbar().get("type").selected = "sitemap";
+                UpdateComponentDropdown("sitemap");
+            }
+        }
+        else {
+            SetToolbarItemsVisible(ENTITY_DEPENDENT_TYPE_ITEMS, true);
+            SetToolbarItemsVisible(GLOBAL_TYPE_ITEMS, false);
+            SetToolbarItemsVisible(["type:content"], false);
+
+            if (entityTarget === "entitySelect:Adx_contentsnippet" || entityTarget === "Adx_contentsnippet") {
+                SetToolbarItemsVisible(["type:content"], true);
+            }
+
+            if (["content", "webresources", "dashboards", "sitemap", "globalOptionSets"].indexOf(GetToolbar().get("type").selected) !== -1) {
+                GetToolbar().get("type").selected = "attributes";
+                UpdateComponentDropdown("attributes");
+            }
+        }
+    }
+
+    function SetSolutionRequiredState(enabled) {
+        SetToolbarItemsEnabled(["entitySelect", "type", "load"], enabled);
+
+        if (!enabled) {
+            SetToolbarItemsVisible(ENTITY_DEPENDENT_TYPE_ITEMS, false);
+            SetToolbarItemsVisible(GLOBAL_TYPE_ITEMS, false);
+            SetToolbarItemsEnabled(["component"], false);
+        }
+
+        RefreshToolbar();
     }
 
     function SetToolbarLocked(locked) {
@@ -1584,6 +1653,10 @@
     function LoadHandler () {
         var entity = XrmTranslator.GetEntity();
 
+        if (!HasSelectedSolution()) {
+            return DialogHelper.alert("Please select a solution before loading.");
+        }
+
         if (!entity || !XrmTranslator.GetType()) {
             return;
         }
@@ -1609,7 +1682,7 @@
             height: 310,
             modal: true,
             showClose: true,
-            showMax: true,
+            showMax: false,
             buttons: '<button class="w2ui-btn" onclick="w2popup.close();">Close</button>',
             onOpen: function (event) {
                 event.onComplete = function () {
@@ -1621,8 +1694,7 @@
 
     function ShowHelp () {
         var html = '<div style="padding: 15px 20px; font-size: 13px; line-height: 1.8;">' +
-            '<b>Solution filter:</b> Selecting a Solution filters the Entity list to only show entities in that solution. ' +
-            'Use <i>Default Solution</i> to see all entities.' +
+            '<b>Solution filter:</b> Select a Solution first. The Entity list and solution-level types are scoped to that solution.' +
             '<hr style="margin: 8px 0; border: none; border-top: 1px solid #ddd;">' +
             '<b>Entity-based types</b> (select an Entity first):' +
             '<ul style="margin: 4px 0 12px 0; padding-left: 20px;">' +
@@ -1639,10 +1711,10 @@
             '</ul>' +
             '<b>Entity-independent types</b> (set Entity to None):' +
             '<ul style="margin: 4px 0 12px 0; padding-left: 20px;">' +
-            '<li><b>1. Sitemap</b> — Entity &rarr; None &rarr; Type &rarr; Sitemap &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>2. Dashboards</b> — Entity &rarr; None &rarr; Type &rarr; Dashboards &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>3. Web Resources</b> — Entity &rarr; None &rarr; Type &rarr; Web Resources &rarr; Load &rarr; Translate &rarr; Save</li>' +
-            '<li><b>4. Global Option Sets</b> — Entity &rarr; None &rarr; Type &rarr; Global Option Sets &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>10. Sitemap</b> — Solution &rarr; Entity &rarr; None &rarr; Type &rarr; Sitemap &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>11. Dashboards</b> — Solution &rarr; Entity &rarr; None &rarr; Type &rarr; Dashboards &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>12. Web Resources</b> — Solution &rarr; Entity &rarr; None &rarr; Type &rarr; Web Resources &rarr; Load &rarr; Translate &rarr; Save</li>' +
+            '<li><b>13. Global Option Sets</b> — Solution &rarr; Entity &rarr; None &rarr; Type &rarr; Global Option Sets &rarr; Load &rarr; Translate &rarr; Save</li>' +
             '</ul>' +
             '<b>Special type:</b>' +
             '<ul style="margin: 4px 0 0 0; padding-left: 20px;">' +
@@ -1675,7 +1747,7 @@
             height: 520,
             modal: true,
             showClose: true,
-            showMax: true,
+            showMax: false,
             onOpen: function (event) {
                 event.onComplete = function () {
                     setTimeout(function () { w2popup.max(); }, 100);
@@ -1740,32 +1812,12 @@
         }
 
         if (target.startsWith("entitySelect:")) {
-            if (target === "entitySelect:none") {
-                SetToolbarItemsVisible(ENTITY_DEPENDENT_TYPE_ITEMS, false);
-                SetToolbarItemsVisible(GLOBAL_TYPE_ITEMS, true);
-
-                if (["allInOne", "attributes", "options", "forms", "views", "formMeta", "entityMeta", "relationships", "charts", "bpf", "content"].indexOf(GetToolbar().get("type").selected) !== -1) {
-                    GetToolbar().get("type").selected = "sitemap";
-                    UpdateComponentDropdown("sitemap");
-                    RefreshToolbar();
-                }
-            }
-            else {
-                SetToolbarItemsVisible(ENTITY_DEPENDENT_TYPE_ITEMS, true);
-                SetToolbarItemsVisible(GLOBAL_TYPE_ITEMS, false);
-                SetToolbarItemsVisible(["type:content"], false);
-
-                if (target === "entitySelect:Adx_contentsnippet") {
-                    SetToolbarItemsVisible(["type:content"], true);
-                }
-
-                if (["content", "webresources", "dashboards", "sitemap", "globalOptionSets"].indexOf(GetToolbar().get("type").selected) !== -1) {
-                    GetToolbar().get("type").selected = "attributes";
-                    UpdateComponentDropdown("attributes");
-                    RefreshToolbar();
-                }
+            if (!HasSelectedSolution()) {
+                return;
             }
 
+            ApplyTypeVisibilityForEntity(target);
+            RefreshToolbar();
             return;
         }
 
@@ -1800,11 +1852,8 @@
                     }
                     return 'Solution';
                 },
-                selected: 'all',
-                items: [
-                    { id: 'all', text: 'Default Solution', icon: 'icon-solution' },
-                    { text: '--' }
-                ]
+                selected: null,
+                items: []
             },
             { type: 'menu-radio', id: 'entitySelect', icon: 'icon-entity',
                 tooltip: 'Entity',
@@ -1837,11 +1886,11 @@
                     { id: 'relationships', text: '7. Relationships', icon: 'icon-link' },
                     { id: 'charts', text: '8. Charts', icon: 'icon-chart' },
                     { id: 'bpf', text: '9. Business Process Flows', icon: 'icon-flow' },
-                    { id: 'sitemap', text: '1. Sitemap', icon: 'icon-sitemap' },
+                    { id: 'sitemap', text: '10. Sitemap', icon: 'icon-sitemap' },
                     { id: 'content', text: 'Content', icon: 'icon-code' },
-                    { id: 'dashboards', text: '2. Dashboards', icon: 'icon-dashboard' },
-                    { id: 'webresources', text: '3. Web Resources', icon: 'icon-file-code' },
-                    { id: 'globalOptionSets', text: '4. Global Option Sets', icon: 'icon-global-options' }
+                    { id: 'dashboards', text: '11. Dashboards', icon: 'icon-dashboard' },
+                    { id: 'webresources', text: '12. Web Resources', icon: 'icon-file-code' },
+                    { id: 'globalOptionSets', text: '13. Global Option Sets', icon: 'icon-global-options' }
                 ])
             },
             { type: 'menu-radio', id: 'component', icon: 'icon-component',
@@ -1889,7 +1938,7 @@
 
         toolbarItems.push({ type: 'spacer' });
 
-        if (XrmTranslator.showDebugButton) {
+        if (IsDebugToolbarEnabled()) {
             toolbarItems.push({ type: 'button', id: 'debugAutofill', text: 'DEBUG', tooltip: 'Apply debug translations', icon: 'icon-debug', onClick: function () {
                 TranslationHandler.ApplyDebugTranslations();
             } });
@@ -1934,8 +1983,10 @@
 
         var gridToolbar = w2ui['grid_toolbar'];
 
-        // Hide entity-dependent items on initial load (entity defaults to None)
+        // Require selecting a solution before enabling scoped actions.
         SetToolbarItemsVisible(ENTITY_DEPENDENT_TYPE_ITEMS, false);
+        SetToolbarItemsVisible(GLOBAL_TYPE_ITEMS, false);
+        SetSolutionRequiredState(false);
 
         gridToolbar.insert('w2ui-search-advanced', { type: 'menu', id: 'toggle', text: '', tooltip: 'Expand/collapse rows', icon: 'icon-tree',
             items: [
@@ -2039,7 +2090,7 @@
         XrmTranslator.entityMetadata = {};
 
         if (!solutionId || solutionId === 'all') {
-            FillEntitySelector(XrmTranslator.allEntities);
+            SetSolutionRequiredState(false);
             RefreshToolbar();
             return Promise.resolve();
         }
@@ -2052,6 +2103,9 @@
                 return metadataIds.indexOf(e.MetadataId.toLowerCase()) !== -1;
             });
             FillEntitySelector(solutionEntities);
+            SetToolbarItemsEnabled(["entitySelect", "type", "load"], true);
+            ApplyTypeVisibilityForEntity("entitySelect:none");
+            UpdateComponentDropdown(GetToolbar().get("type").selected || "sitemap");
             RefreshToolbar();
             XrmTranslator.UnlockGrid();
         })
@@ -2192,7 +2246,7 @@
             XrmTranslator.allEntities = entities;
 
             FillSolutionSelector(solutions);
-            return FillEntitySelector(entities);
+            return entities;
         })
         .then(function () {
             return TranslationHandler.GetAvailableLanguages();
