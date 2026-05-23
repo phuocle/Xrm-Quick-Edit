@@ -182,13 +182,14 @@
 
     ViewHandler.SaveOnly = function() {
         var updates = GetUpdates();
-        var requests = [];
-
-        for (var i = 0; i < updates.length; i++) {
-            var update = updates[i];
-
-            var request = WebApiClient.Requests.SetLocLabelsRequest
-                .with({
+        return XrmTranslator.ExecuteChangeSetBatches(updates, {
+            progressLabel: "Saving view batches",
+            batchNamePrefix: "batch_setviewlabels",
+            changeSetNamePrefix: "changeset_setviewlabels",
+            buildRequest: function(update) {
+                return new WebApiClient.BatchRequest({
+                    method: "POST",
+                    url: WebApiClient.GetApiUrl() + "SetLocLabels",
                     payload: {
                         Labels: update.labels.Label.LocalizedLabels,
                         EntityMoniker: {
@@ -198,17 +199,8 @@
                         AttributeName: "name"
                     }
                 });
-
-            requests.push(request);
-        }
-
-        var saveIndex = 0;
-
-        return WebApiClient.Promise.resolve(requests)
-            .each(function(request) {
-                XrmTranslator.LockGridProgress("Saving views", ++saveIndex, requests.length);
-                return WebApiClient.Execute(request);
-            })
+            }
+        })
             .then(function () {
                 return XrmTranslator.AddToSolution(updates.map(function(u) { return u.recid; }), XrmTranslator.ComponentType.SavedQuery);
             });

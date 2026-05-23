@@ -184,13 +184,18 @@
             }
         }
 
-        var saveIndex = 0;
-
-        return WebApiClient.Promise.resolve(updates)
-            .each(function (payload) {
-                XrmTranslator.LockGridProgress("Saving global option sets", ++saveIndex, updates.length);
-                return WebApiClient.SendRequest("POST", WebApiClient.GetApiUrl() + "UpdateOptionValue", payload);
-            })
+        return XrmTranslator.ExecuteChangeSetBatches(updates, {
+            progressLabel: "Saving global option set batches",
+            batchNamePrefix: "batch_updateglobaloptionvalue",
+            changeSetNamePrefix: "changeset_updateglobaloptionvalue",
+            buildRequest: function(payload) {
+                return new WebApiClient.BatchRequest({
+                    method: "POST",
+                    url: WebApiClient.GetApiUrl() + "UpdateOptionValue",
+                    payload: payload
+                });
+            }
+        })
             .then(function () {
                 XrmTranslator.LockGrid("Publishing");
 

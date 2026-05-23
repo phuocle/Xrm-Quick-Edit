@@ -678,6 +678,7 @@
         var changeSetNamePrefix = options.changeSetNamePrefix || "changeset";
         var buildRequest = options.buildRequest;
         var saveIndex = 0;
+        var responses = [];
 
         if (!buildRequest) {
             throw new Error("XrmTranslator.ExecuteChangeSetBatches requires buildRequest.");
@@ -688,11 +689,17 @@
                 XrmTranslator.LockGridProgress(progressLabel, ++saveIndex, batches.length);
 
                 var requests = batchItems.map(function(item, index) {
-                    return buildRequest(item, {
+                    var request = buildRequest(item, {
                         batchIndex: batchIndex,
                         index: index,
                         contentId: (batchIndex * batchSize) + index + 1
                     });
+
+                    if (request && !request.contentId) {
+                        request.contentId = (batchIndex * batchSize) + index + 1;
+                    }
+
+                    return request;
                 });
 
                 var changeSet = new WebApiClient.ChangeSet({
@@ -714,7 +721,20 @@
 
                             throw new Error(errorMessage);
                         }
+
+                        if (response && response.changeSetResponses) {
+                            for (var i = 0; i < response.changeSetResponses.length; i++) {
+                                responses = responses.concat(response.changeSetResponses[i].responses || []);
+                            }
+                        }
+
+                        if (response && response.batchResponses) {
+                            responses = responses.concat(response.batchResponses);
+                        }
                     });
+            })
+            .then(function() {
+                return responses;
             });
     };
 

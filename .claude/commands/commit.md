@@ -1,180 +1,116 @@
 ---
 name: commit
-description: Complete git workflow - initialize repo if needed, stage and commit everything, push if remote exists, then run /improve and /compact. Use for clean checkpoint commits.
+description: Stage and commit local code changes only. Never push.
 ---
 
 # Commit Skill
 
-A complete git workflow skill that ensures a clean repository state after every commit.
+Create a local git commit for the current repository. This command is intentionally local-only: do not push, create PRs, run deployment, or trigger any remote workflow.
 
 ## What This Skill Does
 
-1. **Initialize git** (if not already a git repo)
-2. **Stage everything** (`git add -A`)
-3. **Commit** with an auto-generated or user-provided message
-4. **Verify clean state** (`git status --porcelain` must be empty)
-5. **Push** (only if a remote exists)
-6. **Run /improve** (knowledge capture and tool discovery)
-7. **Run /compact** (context compression)
+1. Inspect repository status.
+2. Stage all local changes.
+3. Create a commit with a concise message.
+4. Verify the local working tree state after the commit.
 
 ## Usage
 
-```
+```bash
 /commit
 /commit -m "your commit message"
 ```
 
 ## Workflow Steps
 
-### Step 1: Initialize Git (if needed)
+### Step 1: Verify Git Repository
 
 Check if the current directory is inside a git repository:
 
 ```bash
-git rev-parse --is-inside-work-tree 2>/dev/null
+git rev-parse --is-inside-work-tree
 ```
 
-If this fails (exit code non-zero), initialize a new repo:
+If this fails, stop and report that the current directory is not a git repository. Do not initialize a new repository unless the user explicitly asks.
+
+### Step 2: Inspect Changes
+
+Review the current worktree before staging:
 
 ```bash
-git init
+git status --short
+git diff --stat
 ```
 
-### Step 2: Stage All Changes
+If there are no changes, report "Nothing to commit - working tree clean" and stop.
 
-Add all files (tracked, untracked, and deletions):
+### Step 3: Stage All Changes
+
+Stage tracked changes, untracked files, and deletions:
 
 ```bash
 git add -A
 ```
 
-### Step 3: Generate Commit Message
+### Step 4: Generate Commit Message
 
-If no message was provided via `-m`, generate one by:
+If no message was provided via `-m`, generate one from the staged diff:
 
-1. Running `git diff --cached --stat` to see what's staged
-2. Creating a concise summary of the changes
+```bash
+git diff --cached --stat
+```
 
 The commit message should:
-- Be concise (under 72 characters for the subject line)
-- Describe what changed, not how
-- Use imperative mood ("Add feature" not "Added feature")
+- Be concise.
+- Use an imperative subject line.
+- Describe what changed, not how.
+- Avoid vague subjects such as "update", "fix", or "changes".
 
-### Step 4: Commit
+### Step 5: Commit
 
-```bash
-git commit -m "$(cat <<'EOF'
-Your commit message here
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-)"
-```
-
-**CRITICAL**: Never use `--no-verify`. Pre-commit hooks must run.
-
-### Step 5: Verify Clean State
-
-After commit, verify the repository is completely clean:
+Create a normal verified commit:
 
 ```bash
-git status --porcelain
+git commit -m "Your commit message here"
 ```
 
-This must return empty output. If anything remains:
-- Investigate why files weren't committed
-- Stage and commit any remaining files
-- Repeat until `git status --porcelain` returns nothing
+Never use `--no-verify`. Pre-commit hooks must run.
 
-### Step 6: Push (if remote exists)
+### Step 6: Verify Local State
 
-Check if a remote exists:
+After committing, inspect the repository again:
 
 ```bash
-git remote -v
+git status --short
 ```
 
-If output is non-empty AND the current branch has an upstream:
+If files remain, report the remaining paths. Do not create additional commits unless the user asked to commit everything and the remaining files are part of the same requested work.
 
-```bash
-git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null
-```
+## Hard Rules
 
-If upstream exists, push:
-
-```bash
-git push
-```
-
-If no upstream but remote exists, set upstream and push:
-
-```bash
-git push -u origin $(git branch --show-current)
-```
-
-If no remote exists, skip pushing silently.
-
-### Step 7: Run /improve
-
-Invoke the improve skill to capture learnings:
-
-```
-/improve
-```
-
-This runs knowledge capture and tool discovery.
-
-### Step 8: Run /compact
-
-Invoke the compact command to compress context:
-
-```
-/compact
-```
-
-This summarizes the conversation and reduces token usage.
-
-## Error Handling
-
-### Pre-commit Hook Failures
-
-If the commit fails due to pre-commit hooks:
-1. **Fix the issues** reported by the hooks
-2. **Re-stage** the fixed files
-3. **Try committing again** (new commit, not amend)
-4. Never use `--no-verify`
-
-### Nothing to Commit
-
-If `git status` shows nothing to commit:
-- Report "Nothing to commit - working tree clean"
-- Still run /improve and /compact
-
-### Push Failures
-
-If push fails:
-- Report the error to the user
-- Do not retry automatically
-- Continue with /improve and /compact
+- Do not run `git push`.
+- Do not run `git push -u`.
+- Do not create or update pull requests.
+- Do not deploy.
+- Do not run `/improve`.
+- Do not run `/compact`.
+- Do not initialize a repository unless explicitly requested.
+- Do not use `--no-verify`.
 
 ## Output Format
 
-```
+```markdown
 ## Commit Summary
 
 ### Repository
-[Repo path or "Initialized new repo at: path"]
+[Repo path]
 
 ### Changes Committed
-[Brief summary of staged changes]
+[Brief summary of committed changes]
 
 ### Commit
 [Commit hash and message]
 
-### Push
-[Push result or "No remote configured"]
-
-### Post-Commit
-Running /improve...
-Running /compact...
+### Status
+[Clean or remaining local changes]
 ```

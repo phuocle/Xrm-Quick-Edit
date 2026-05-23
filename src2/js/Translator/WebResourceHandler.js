@@ -26,7 +26,12 @@
     "use strict";
 
     var idSeparator = "|";
-    var lcidRegex = /([0-9]+)\.js/i;
+    var localizedFileRegex = /([0-9]+)\.(js|resx)$/i;
+    var localizedNameRegex = /([0-9]+)$/i;
+    var webResourceType = {
+        script: 3,
+        resx: 12
+    };
 
     function GetGroupKey (id) {
         var separatorIndex = id.indexOf(idSeparator);
@@ -36,6 +41,246 @@
         }
 
         return id.substring(0, separatorIndex);
+    }
+
+    function GetCreatedIdFromResponse(response) {
+        if (!response || !response.headers) {
+            return null;
+        }
+
+        var entityId = response.headers["OData-EntityId"] || response.headers["OData-EntityID"] || response.headers["odata-entityid"];
+        var match = entityId && /\(([^)]+)\)/.exec(entityId);
+
+        return match ? match[1] : null;
+    }
+
+    function EscapeODataString(value) {
+        return String(value || "").replace(/'/g, "''");
+    }
+
+    function IsResxResource(resource) {
+        var type = resource ? resource.webresourcetype : null;
+
+        return type === webResourceType.resx || String(type || "").toLowerCase().indexOf("resx") !== -1;
+    }
+
+    function MatchLocalizedResource(resource) {
+        var name = resource ? resource.name : "";
+        var displayName = resource ? resource.displayname : "";
+        var candidates = [name, displayName];
+        var i;
+        var matches;
+
+        for (i = 0; i < candidates.length; i++) {
+            matches = candidates[i] ? candidates[i].match(localizedFileRegex) : null;
+
+            if (matches && matches.length > 2) {
+                return {
+                    lcid: matches[1],
+                    format: matches[2].toLowerCase()
+                };
+            }
+        }
+
+        if (!IsResxResource(resource)) {
+            return null;
+        }
+
+        for (i = 0; i < candidates.length; i++) {
+            matches = candidates[i] ? candidates[i].match(localizedNameRegex) : null;
+
+            if (matches && matches.length > 1) {
+                return {
+                    lcid: matches[1],
+                    format: "resx"
+                };
+            }
+        }
+
+        return null;
+    }
+
+    function GetResourceLcid(resource) {
+        var match = MatchLocalizedResource(resource);
+
+        return match ? match.lcid : undefined;
+    }
+
+    function GetResourceFormat(resource) {
+        var match = MatchLocalizedResource(resource);
+
+        return match ? match.format : undefined;
+    }
+
+    function IsLocalizableResource(resource, baseLanguage) {
+        var match = MatchLocalizedResource(resource);
+
+        return !!match && match.lcid == baseLanguage && (match.format === "js" || match.format === "resx");
+    }
+
+    function GetResourceType(format) {
+        return format === "resx" ? webResourceType.resx : webResourceType.script;
+    }
+
+    function GetResourceGroupingKey(resource, lcid) {
+        var name = resource.name || "";
+        var index = name.indexOf(lcid);
+
+        if (index !== -1) {
+            return name.substr(0, index);
+        }
+
+        var displayName = resource.displayname || "";
+        index = displayName.indexOf(lcid);
+
+        return index !== -1 ? displayName.substr(0, index) : name || displayName;
+    }
+
+    function ReplaceResourceLcid(value, currentLcid, nextLcid) {
+        return value ? value.replace(currentLcid, nextLcid) : value;
+    }
+
+    function ParseResxContent(xml) {
+        var doc = new DOMParser().parseFromString(xml, "application/xml");
+
+        if (doc.getElementsByTagName("parsererror").length > 0) {
+            throw new Error("Invalid RESX XML.");
+        }
+
+        var content = {};
+        var dataNodes = doc.getElementsByTagName("data");
+
+        for (var i = 0; i < dataNodes.length; i++) {
+            var dataNode = dataNodes[i];
+            var name = dataNode.getAttribute("name");
+            var valueNodes = dataNode.getElementsByTagName("value");
+
+            if (!name || valueNodes.length === 0) {
+                continue;
+            }
+
+            content[name] = valueNodes[0].textContent || "";
+        }
+
+        return content;
+    }
+
+    function SerializeResxContent(xml, content) {
+        var doc = new DOMParser().parseFromString(xml, "application/xml");
+        var dataNodes = doc.getElementsByTagName("data");
+        var existingNames = {};
+
+        for (var i = 0; i < dataNodes.length; i++) {
+            var dataNode = dataNodes[i];
+            var name = dataNode.getAttribute("name");
+            var valueNodes = dataNode.getElementsByTagName("value");
+
+            if (!name || valueNodes.length === 0) {
+                continue;
+            }
+
+            existingNames[name] = true;
+
+            if (Object.prototype.hasOwnProperty.call(content, name)) {
+                valueNodes[0].textContent = content[name] || "";
+            }
+        }
+
+        var root = doc.documentElement;
+        for (var key in content) {
+            if (!Object.prototype.hasOwnProperty.call(content, key) || existingNames[key]) {
+                continue;
+            }
+
+            var newData = doc.createElement("data");
+            newData.setAttribute("name", key);
+            newData.setAttribute("xml:space", "preserve");
+
+            var newValue = doc.createElement("value");
+            newValue.textContent = content[key] || "";
+            newData.appendChild(newValue);
+            root.appendChild(newData);
+        }
+
+        return new XMLSerializer().serializeToString(doc);
+    }
+
+    function ParseWebResource(resource) {
+        var format = GetResourceFormat(resource);
+        var rawContent = b64DecodeUnicode(resource.content || "");
+        var parsedContent;
+
+        if (format === "resx") {
+            parsedContent = ParseResxContent(rawContent);
+        }
+        else {
+            parsedContent = JSON.parse(rawContent);
+        }
+
+        return Object.assign(resource, {
+            content: parsedContent,
+            __format: format === "resx" ? "resx" : "json",
+            __rawContent: rawContent,
+            __lcid: GetResourceLcid(resource)
+        });
+    }
+
+    function EncodeWebResourceContent(webresource) {
+        if (webresource.__format === "resx") {
+            return b64EncodeUnicode(SerializeResxContent(webresource.__rawContent, webresource.content));
+        }
+
+        return b64EncodeUnicode(JSON.stringify(webresource.content));
+    }
+
+    function GetSelectedSolutionWebResourceIds() {
+        var solutionId = XrmTranslator.GetSolution();
+
+        if (!solutionId || solutionId === "all") {
+            return Promise.resolve(null);
+        }
+
+        return WebApiClient.Retrieve({
+            entityName: "solutioncomponent",
+            queryParams: "?$select=objectid&$filter=_solutionid_value eq " + solutionId + " and componenttype eq " + XrmTranslator.ComponentType.WebResource
+        })
+        .then(function(response) {
+            return response.value.map(function(component) {
+                return component.objectid;
+            });
+        });
+    }
+
+    function RetrieveWebResource(id) {
+        return WebApiClient.Retrieve({
+            overriddenSetName: "webresourceset",
+            entityId: id,
+            queryParams: "?$select=webresourceid,name,displayname,content,webresourcetype"
+        });
+    }
+
+    function RetrieveBaseLanguageResources(baseLanguage) {
+        return GetSelectedSolutionWebResourceIds()
+        .then(function(ids) {
+            if (ids) {
+                return WebApiClient.Promise.all(ids.map(RetrieveWebResource))
+                    .then(function(resources) {
+                        return resources.filter(function(resource) {
+                            return IsLocalizableResource(resource, baseLanguage);
+                        });
+                    });
+            }
+
+            return WebApiClient.Retrieve({
+                overriddenSetName: "webresourceset",
+                queryParams: "?$select=webresourceid,name,displayname,content,webresourcetype&$filter=contains(name, '" + EscapeODataString(baseLanguage) + "') or contains(displayname, '" + EscapeODataString(baseLanguage) + "')"
+            })
+            .then(function(response) {
+                return response.value.filter(function(resource) {
+                    return IsLocalizableResource(resource, baseLanguage);
+                });
+            });
+        });
     }
 
     function GetUpdates(records) {
@@ -61,12 +306,17 @@
                     // In this case, we need to create a new web resource
                     if (!updateRecord) {
                         var baseLanguageRecord = group.find(function(w) { return w.__lcid == XrmTranslator.baseLanguage });
+                        var newName = baseLanguageRecord ? ReplaceResourceLcid(baseLanguageRecord.name, baseLanguageRecord.__lcid, change) : groupKey + change + ".js";
 
                         updateRecord = {
                             __lcid: change,
                             webresourceid: undefined,
-                            name: baseLanguageRecord ? baseLanguageRecord.name.replace(XrmTranslator.baseLanguage.toString(), change) : groupKey + change + ".js",
-                            content: baseLanguageRecord ? Object.keys(baseLanguageRecord.content).reduce(function(all, cur) { all[cur] = null; return all; }, {}) : { }
+                            name: newName,
+                            displayname: baseLanguageRecord ? ReplaceResourceLcid(baseLanguageRecord.displayname || baseLanguageRecord.name, baseLanguageRecord.__lcid, change) : newName,
+                            content: baseLanguageRecord ? Object.keys(baseLanguageRecord.content).reduce(function(all, cur) { all[cur] = null; return all; }, {}) : { },
+                            __format: baseLanguageRecord ? baseLanguageRecord.__format : "json",
+                            __rawContent: baseLanguageRecord ? baseLanguageRecord.__rawContent : "{}",
+                            webresourcetype: baseLanguageRecord ? GetResourceType(baseLanguageRecord.__format) : webResourceType.script
                         }
                     }
 
@@ -98,7 +348,7 @@
                 continue;
             }
             
-            keyRecord[resource.__lcid] = w2utils.encodeTags(value);
+            keyRecord[resource.__lcid] = value === null || typeof value === "undefined" ? "" : w2utils.encodeTags(value);
         }
 
         record.w2ui.children.push(keyRecord);
@@ -163,28 +413,25 @@
     WebResourceHandler.Load = function() {
         XrmTranslator.GetBaseLanguage()
         .then(function(baseLanguage) {
-            var request = {
-                overriddenSetName: "webresourceset",
-                queryParams: "?$select=webresourceid,name,content&$filter=contains(name, '" + baseLanguage + ".js')"
-            };
-
-            return WebApiClient.Promise.all([baseLanguage, WebApiClient.Retrieve(request)]);
+            return WebApiClient.Promise.all([baseLanguage, RetrieveBaseLanguageResources(baseLanguage)]);
         })
         .then(function(r) {
             var baseLanguage = r[0];
-            var records = r[1].value;
+            var records = r[1];
 
             return WebApiClient.Promise.all(records.map(function(rec) {
-                var groupingKey = rec.name.substr(0, rec.name.indexOf(baseLanguage));
+                var groupingKey = GetResourceGroupingKey(rec, baseLanguage);
+                var escapedGroupingKey = EscapeODataString(groupingKey);
                 
-                return WebApiClient.Retrieve({ overriddenSetName: "webresourceset", queryParams: "?$select=webresourceid,name,content&$filter=contains(name, '" + groupingKey + "')"})
+                return WebApiClient.Retrieve({ overriddenSetName: "webresourceset", queryParams: "?$select=webresourceid,name,displayname,content,webresourcetype&$filter=contains(name, '" + escapedGroupingKey + "') or contains(displayname, '" + escapedGroupingKey + "')"})
                 .then(function (g) {
                     return { 
                         key: groupingKey,
-                        value: g.value.map(function(w) {
+                        value: g.value.filter(function(w) {
+                            return MatchLocalizedResource(w);
+                        }).map(function(w) {
                             try {
-                                var lcidMatches = w.name.match(lcidRegex);
-                                return Object.assign(w, { content: JSON.parse(b64DecodeUnicode(w.content)), __lcid: lcidMatches.length > 1 ? lcidMatches[1] : undefined });
+                                return ParseWebResource(w);
                             }
                             catch {
                                 return {};
@@ -197,7 +444,7 @@
         .then(function(responses) {
             var groupedResponses = responses.reduce(function(all, cur) {
                 // Filter out resources that could not be parsed
-                var resources = cur.value.filter(function(g) { return typeof(g.content) === "object" });
+                var resources = cur.value.filter(function(g) { return g.content && typeof(g.content) === "object" });
                 
                 if (resources.length > 0) {
                     all[cur.key] = resources;
@@ -219,40 +466,60 @@
         var records = XrmTranslator.GetAllRecords();
         var updates = GetUpdates(records);
 
-        var saveIndex = 0;
+        var createdContentIds = {};
+        var existingIds = updates
+            .filter(function(webresource) { return !!webresource.webresourceid; })
+            .map(function(webresource) { return webresource.webresourceid; });
 
-        return WebApiClient.Promise.resolve(updates)
-        .mapSeries(function(webresource) {
-            XrmTranslator.LockGridProgress("Saving web resources", ++saveIndex, updates.length);
-            var content = b64EncodeUnicode(JSON.stringify(webresource.content));
+        return XrmTranslator.ExecuteChangeSetBatches(updates, {
+            progressLabel: "Saving web resource batches",
+            batchNamePrefix: "batch_savewebresources",
+            changeSetNamePrefix: "changeset_savewebresources",
+            buildRequest: function(webresource, context) {
+                var content = EncodeWebResourceContent(webresource);
 
-            if (webresource.webresourceid) {
-                return WebApiClient.Update({
-                    overriddenSetName: "webresourceset",
-                    entityId: webresource.webresourceid,
-                    entity: {
-                        content: content
-                    }
-                })
-                .then(function() {
-                    return webresource.webresourceid;
-                });
-            }
-            else {
+                if (webresource.webresourceid) {
+                    return WebApiClient.Update({
+                        overriddenSetName: "webresourceset",
+                        entityId: webresource.webresourceid,
+                        entity: {
+                            content: content
+                        },
+                        asBatch: true
+                    });
+                }
+
+                createdContentIds[String(context.contentId)] = true;
+
                 return WebApiClient.Create({
                     overriddenSetName: "webresourceset",
                     entity: {
                         name: webresource.name,
-                        displayname: webresource.name,
+                        displayname: webresource.displayname || webresource.name,
                         content: content,
-                        webresourcetype: 3
-                    }
-                })
-                .then(function(response) {
-                    // "Cut out" created Guid, response format is http://orgname/api/data/v8.0/webresourceset(49f117b8-287a-ea11-8106-0050568e4745)
-                    return response.substr(response.length - 37, 36)
+                        webresourcetype: GetResourceType(webresource.__format)
+                    },
+                    asBatch: true
                 });
             }
+        })
+        .then(function(responses) {
+            var createdIds = [];
+
+            for (var i = 0; i < responses.length; i++) {
+                var response = responses[i];
+
+                if (!createdContentIds[String(response.contentId)]) {
+                    continue;
+                }
+
+                var id = GetCreatedIdFromResponse(response);
+                if (id) {
+                    createdIds.push(id);
+                }
+            }
+
+            return existingIds.concat(createdIds);
         })
         .then(function (ids){
             XrmTranslator.LockGrid("Publishing");

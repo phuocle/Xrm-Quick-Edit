@@ -145,6 +145,10 @@
         SetToolbarLocked(true);
     }
 
+    XrmPropertyEditor.LockGridProgress = function (message, current, total) {
+        XrmPropertyEditor.LockGrid(message + " (" + current + "/" + total + ")");
+    }
+
     XrmPropertyEditor.UnlockGrid = function () {
         XrmPropertyEditor.GetGrid().unlock();
         SetToolbarLocked(false);
@@ -161,6 +165,92 @@
             })
         return WebApiClient.Execute(request);
     }
+
+    XrmPropertyEditor.BatchSaveSize = 25;
+
+    XrmPropertyEditor.CreateBatchName = function(prefix) {
+        return prefix + "_" + Date.now() + "_" + Math.floor(Math.random() * 1000000);
+    };
+
+    XrmPropertyEditor.ChunkArray = function(items, chunkSize) {
+        var chunks = [];
+
+        for (var i = 0; i < items.length; i += chunkSize) {
+            chunks.push(items.slice(i, i + chunkSize));
+        }
+
+        return chunks;
+    };
+
+    XrmPropertyEditor.ExecuteChangeSetBatches = function(items, options) {
+        options = options || {};
+
+        var batchSize = options.batchSize || XrmPropertyEditor.BatchSaveSize;
+        var batches = XrmPropertyEditor.ChunkArray(items || [], batchSize);
+        var progressLabel = options.progressLabel || "Saving batches";
+        var batchNamePrefix = options.batchNamePrefix || "batch";
+        var changeSetNamePrefix = options.changeSetNamePrefix || "changeset";
+        var buildRequest = options.buildRequest;
+        var saveIndex = 0;
+        var responses = [];
+
+        if (!buildRequest) {
+            throw new Error("XrmPropertyEditor.ExecuteChangeSetBatches requires buildRequest.");
+        }
+
+        return WebApiClient.Promise.resolve(batches)
+            .each(function(batchItems, batchIndex) {
+                XrmPropertyEditor.LockGridProgress(progressLabel, ++saveIndex, batches.length);
+
+                var requests = batchItems.map(function(item, index) {
+                    var request = buildRequest(item, {
+                        batchIndex: batchIndex,
+                        index: index,
+                        contentId: (batchIndex * batchSize) + index + 1
+                    });
+
+                    if (request && !request.contentId) {
+                        request.contentId = (batchIndex * batchSize) + index + 1;
+                    }
+
+                    return request;
+                });
+
+                var changeSet = new WebApiClient.ChangeSet({
+                    name: XrmPropertyEditor.CreateBatchName(changeSetNamePrefix),
+                    requests: requests
+                });
+
+                var batch = new WebApiClient.Batch({
+                    name: XrmPropertyEditor.CreateBatchName(batchNamePrefix),
+                    changeSets: [changeSet]
+                });
+
+                return WebApiClient.SendBatch(batch)
+                    .then(function(response) {
+                        if (response && response.isFaulted) {
+                            var errorMessage = response.errors && response.errors.length > 0
+                                ? response.errors.map(function(error) { return error.message || error.code || error; }).join("\n")
+                                : progressLabel + " failed.";
+
+                            throw new Error(errorMessage);
+                        }
+
+                        if (response && response.changeSetResponses) {
+                            for (var i = 0; i < response.changeSetResponses.length; i++) {
+                                responses = responses.concat(response.changeSetResponses[i].responses || []);
+                            }
+                        }
+
+                        if (response && response.batchResponses) {
+                            responses = responses.concat(response.batchResponses);
+                        }
+                    });
+            })
+            .then(function() {
+                return responses;
+            });
+    };
 
     XrmPropertyEditor.GetRecord = function(records, selector) {
         for (var i = 0; i < records.length; i++) {

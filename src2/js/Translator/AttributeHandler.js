@@ -192,29 +192,21 @@
     AttributeHandler.SaveOnly = function() {
         var updates = GetUpdates();
 
-        var requests = [];
         var entityUrl = WebApiClient.GetApiUrl() + "EntityDefinitions(" + XrmTranslator.GetEntityId() + ")/Attributes(";
 
-        for (var i = 0; i < updates.length; i++) {
-            var update = updates[i];
-            var url = entityUrl + update.MetadataId + ")";
-
-            var request = {
-                method: "PUT",
-                url: url,
-                attribute: update,
-                headers: [{key: "MSCRM.MergeLabels", value: "true"}]
-            };
-            requests.push(request);
-        }
-
-        var saveIndex = 0;
-
-        return WebApiClient.Promise.resolve(requests)
-            .each(function(request) {
-                XrmTranslator.LockGridProgress("Saving attributes", ++saveIndex, requests.length);
-                return WebApiClient.SendRequest(request.method, request.url, request.attribute, request.headers);
-            })
+        return XrmTranslator.ExecuteChangeSetBatches(updates, {
+            progressLabel: "Saving attribute batches",
+            batchNamePrefix: "batch_updateattributes",
+            changeSetNamePrefix: "changeset_updateattributes",
+            buildRequest: function(update) {
+                return new WebApiClient.BatchRequest({
+                    method: "PUT",
+                    url: entityUrl + update.MetadataId + ")",
+                    payload: update,
+                    headers: [{key: "MSCRM.MergeLabels", value: "true"}]
+                });
+            }
+        })
             .then(function () {
                 return XrmTranslator.AddToSolution(updates.map(function(u) { return u.MetadataId; }), XrmTranslator.ComponentType.Attribute);
             });

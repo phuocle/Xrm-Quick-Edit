@@ -228,18 +228,23 @@
             return ContentSnippetHandler.Load();
         }
 
-        var saveIndex = 0;
+        return XrmTranslator.ExecuteChangeSetBatches(updates, {
+            progressLabel: "Saving content snippet batches",
+            batchNamePrefix: "batch_savecontentsnippets",
+            changeSetNamePrefix: "changeset_savecontentsnippets",
+            buildRequest: function(payload) {
+                var request;
 
-        return WebApiClient.Promise.resolve(updates)
-            .each(function(payload) {
-                XrmTranslator.LockGridProgress("Saving content snippets", ++saveIndex, updates.length);
                 if (payload.entityId) {
-                    return WebApiClient.Update(payload);
+                    request = WebApiClient.Update(Object.assign({}, payload, { asBatch: true }));
                 }
                 else {
-                    return WebApiClient.Create(payload);
+                    request = WebApiClient.Create(Object.assign({}, payload, { asBatch: true }));
                 }
-            })
+
+                return request;
+            }
+        })
             .then(function (response) {
                 XrmTranslator.LockGrid("Reloading");
 

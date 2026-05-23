@@ -174,13 +174,14 @@
 
     FormMetaHandler.SaveOnly = function() {
         var updates = GetUpdates();
-        var requests = [];
-
-        for (var i = 0; i < updates.length; i++) {
-            var update = updates[i];
-
-            var request = WebApiClient.Requests.SetLocLabelsRequest
-                .with({
+        return XrmTranslator.ExecuteChangeSetBatches(updates, {
+            progressLabel: "Saving form metadata batches",
+            batchNamePrefix: "batch_setformmetalabels",
+            changeSetNamePrefix: "changeset_setformmetalabels",
+            buildRequest: function(update) {
+                return new WebApiClient.BatchRequest({
+                    method: "POST",
+                    url: WebApiClient.GetApiUrl() + "SetLocLabels",
                     payload: {
                         Labels: update.labels.Label.LocalizedLabels,
                         EntityMoniker: {
@@ -190,17 +191,8 @@
                         AttributeName: "name"
                     }
                 });
-
-            requests.push(request);
-        }
-
-        var saveIndex = 0;
-
-        return WebApiClient.Promise.resolve(requests)
-            .each(function(request) {
-                XrmTranslator.LockGridProgress("Saving form metadata", ++saveIndex, requests.length);
-                return WebApiClient.Execute(request);
-            })
+            }
+        })
             .then(function () {
                 if (XrmTranslator.GetEntity().toLowerCase() === "none") {
                     return XrmTranslator.AddToSolution(updates.map(function(u) { return u.recid; }), XrmTranslator.ComponentType.SystemForm, true, true);

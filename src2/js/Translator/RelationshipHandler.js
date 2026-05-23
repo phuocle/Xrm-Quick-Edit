@@ -326,16 +326,26 @@
             });
         }
 
-        var saveIndex = 0;
+        if (requests.length === 0) {
+            return WebApiClient.Promise.resolve();
+        }
 
-        return WebApiClient.Promise.resolve(requests)
-            .each(function (request) {
-                XrmTranslator.LockGridProgress("Saving relationships", ++saveIndex, requests.length);
-                return WebApiClient.SendRequest(request.method, request.url, request.payload, request.headers);
-            })
+        return XrmTranslator.ExecuteChangeSetBatches(requests, {
+            progressLabel: "Saving relationship batches",
+            batchNamePrefix: "batch_updaterelationships",
+            changeSetNamePrefix: "changeset_updaterelationships",
+            buildRequest: function(request) {
+                return new WebApiClient.BatchRequest({
+                    method: request.method,
+                    url: request.url,
+                    payload: request.payload,
+                    headers: request.headers
+                });
+            }
+        })
             .then(function () {
                 return XrmTranslator.AddToSolution(
-                    updates.map(function (u) { return u.MetadataId; }),
+                    requests.map(function (r) { return r.metadataId; }),
                     XrmTranslator.ComponentType.EntityRelationship
                 );
             });

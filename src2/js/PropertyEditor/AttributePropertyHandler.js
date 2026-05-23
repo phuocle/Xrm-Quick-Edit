@@ -158,26 +158,21 @@
 
         var updates = GetUpdates();
 
-        var requests = [];
         var entityUrl = WebApiClient.GetApiUrl() + "EntityDefinitions(" + XrmPropertyEditor.GetEntityId() + ")/Attributes(";
 
-        for (var i = 0; i < updates.length; i++) {
-            var update = updates[i];
-            var url = entityUrl + update.MetadataId + ")";
-
-            var request = {
-                method: "PUT",
-                url: url,
-                attribute: update,
-                headers: [{key: "MSCRM.MergeLabels", value: "true"}]
-            };
-            requests.push(request);
-        }
-
-        WebApiClient.Promise.resolve(requests)
-            .each(function(request) {
-                return WebApiClient.SendRequest(request.method, request.url, request.attribute, request.headers);
-            })
+        return XrmPropertyEditor.ExecuteChangeSetBatches(updates, {
+            progressLabel: "Saving attribute property batches",
+            batchNamePrefix: "batch_updateattributeproperties",
+            changeSetNamePrefix: "changeset_updateattributeproperties",
+            buildRequest: function(update) {
+                return new WebApiClient.BatchRequest({
+                    method: "PUT",
+                    url: entityUrl + update.MetadataId + ")",
+                    payload: update,
+                    headers: [{key: "MSCRM.MergeLabels", value: "true"}]
+                });
+            }
+        })
             .then(function (response){
                 XrmPropertyEditor.LockGrid("Publishing");
 
