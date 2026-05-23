@@ -27,6 +27,7 @@
 
     FormHandler.selectedForms = null;
     FormHandler.formsByLanguage = null;
+    FormHandler.loadedFormsData = null;
     FormHandler.lastId = null;
 
     function GetParsedForm (form) {
@@ -198,6 +199,61 @@
         grid.unlock();
     }
 
+    function FillAllFormsTable(allFormData) {
+        var grid = XrmTranslator.GetGrid();
+        var records = [];
+        var loadedFormsData = [];
+
+        grid.clear();
+
+        for (var i = 0; i < allFormData.length; i++) {
+            var formData = allFormData[i];
+            var prefix = getFormPrefix(formData.formId);
+            var formRecords = deepClone(formData.records || []);
+
+            prefixRecords(formRecords, prefix);
+
+            loadedFormsData.push({
+                formId: formData.formId,
+                formName: formData.formName,
+                metadata: deepClone(formData.metadata),
+                selectedForms: formData.selectedForms ? formData.selectedForms.slice() : [],
+                prefix: prefix
+            });
+
+            records.push({
+                recid: prefix + "_group",
+                schemaName: GetFormDisplayText({
+                    formid: formData.formId,
+                    name: formData.formName,
+                    type: formData.formType,
+                    objecttypecode: formData.metadata ? formData.metadata.objecttypecode : ""
+                }, {
+                    0: "Dashboard",
+                    2: "Main",
+                    5: "Mobile Express",
+                    6: "Quick View",
+                    7: "Quick Create",
+                    10: "App Module Main",
+                    11: "Interactive Experience",
+                    12: "Card"
+                }),
+                _isGroupNode: true,
+                _isFormGroupNode: true,
+                w2ui: {
+                    children: formRecords,
+                    editable: false,
+                    hideCheckBox: true
+                }
+            });
+        }
+
+        FormHandler.loadedFormsData = loadedFormsData;
+
+        grid.add(records);
+        grid.unlock();
+    }
+
     function GetUserLanguageForm (forms) {
         for (var i = 0; i < forms.length; i++) {
             if (forms[i].languageCode === XrmTranslator.userSettings.uilanguageid) {
@@ -235,6 +291,7 @@
             }
         }
 
+        FormHandler.loadedFormsData = null;
         FillTable();
     }
 
@@ -247,6 +304,64 @@
         }
 
         return String(value).trim();
+    }
+
+    function deepClone(obj) {
+        return JSON.parse(JSON.stringify(obj));
+    }
+
+    function getFormPrefix(formId) {
+        return "form~" + formId + "~";
+    }
+
+    function prefixRecords(records, prefix) {
+        for (var i = 0; i < records.length; i++) {
+            var record = records[i];
+            record.recid = prefix + record.recid;
+
+            if (record.w2ui && record.w2ui.children) {
+                prefixRecords(record.w2ui.children, prefix);
+            }
+        }
+    }
+
+    function stripPrefix(recid, prefix) {
+        if (recid && recid.indexOf(prefix) === 0) {
+            return recid.substring(prefix.length);
+        }
+
+        return recid;
+    }
+
+    function stripPrefixFromRecords(records, prefix) {
+        for (var i = 0; i < records.length; i++) {
+            var record = records[i];
+            record.recid = stripPrefix(record.recid, prefix);
+
+            if (record.w2ui && record.w2ui.children) {
+                stripPrefixFromRecords(record.w2ui.children, prefix);
+            }
+        }
+    }
+
+    function hasChanges(records) {
+        return records.some(function(record) {
+            if (record.w2ui && record.w2ui.changes && Object.keys(record.w2ui.changes).length > 0) {
+                return true;
+            }
+
+            if (record.w2ui && record.w2ui.children) {
+                return hasChanges(record.w2ui.children);
+            }
+
+            return false;
+        });
+    }
+
+    function isFormGroupGrid(records) {
+        return records.some(function(record) {
+            return record && record._isFormGroupNode;
+        });
     }
 
     function IsNoneEntity(entityName) {
@@ -376,91 +491,6 @@
         .catch(XrmTranslator.errorHandler);
     };
 
-    function ShowFormSelection () {
-        var formsByLanguage = FormHandler.formsByLanguage;
-
-        if (!w2ui.formSelectionPrompt) {
-            new w2form({
-                name: 'formSelectionPrompt',
-                style: 'border: 0px; background-color: transparent;',
-                formHTML:
-                    '<div class="w2ui-page page-0 xqt-form-selection-form">'+
-                    '    <div class="xqt-form-selection-row">'+
-                    '        <label class="xqt-form-selection-label" for="formSelection">Form: <span class="xqt-required">*</span></label>'+
-                    '        <div class="xqt-form-selection-control"><input name="formSelection" type="list" /></div>'+
-                    '    </div>'+
-                    '</div>'+
-                    '<div class="w2ui-buttons">'+
-                    '    <button class="w2ui-btn" name="cancel">Cancel</button>'+
-                    '    <button class="w2ui-btn" name="ok">Ok</button>'+
-                    '</div>',
-                fields: [
-                    { field: 'formSelection', type: 'list', required: true }
-                ],
-                actions: {
-                    "ok": function () {
-                        this.validate();
-
-                        ProcessSelection(this.record.formSelection.id);
-
-                        w2popup.close();
-                    },
-                    "cancel": function () {
-                        XrmTranslator.UnlockGrid();
-                        w2popup.close();
-                    }
-                }
-            });
-        }
-
-        var userLanguageForms = GetUserLanguageForm(formsByLanguage).forms.value;
-
-        var formItems = [];
-
-        var formTypeMap = {
-            0: "Dashboard",
-            2: "Main",
-            5: "Mobile Express",
-            6: "Quick View",
-            7: "Quick Create",
-            10: "App Module Main",
-            11: "Interactive Experience",
-            12: "Card Form"
-        };
-
-        for (var i = 0; i < userLanguageForms.length; i++) {
-            var form = userLanguageForms[i];
-
-            formItems.push({
-                id: form.formid,
-                text: GetFormDisplayText(form, formTypeMap)
-            });
-        }
-
-        w2ui.formSelectionPrompt.record.formSelection = null;
-        w2ui.formSelectionPrompt.fields[0].options = { items: formItems };
-
-        w2popup.open({
-            title   : 'Choose Form',
-            name    : 'formSelectionPopup',
-            body    : '<div id="form" class="xqt-form-selection-popup-form"></div>',
-            style   : 'padding: 0px; overflow-x: hidden;',
-            width   : 650,
-            height  : 220,
-            showMax : false,
-            onOpen: function (event) {
-                event.onComplete = function () {
-                    // specifying an onOpen handler instead is equivalent to specifying an onBeforeOpen handler, which would make this code execute too early and hence not deliver.
-                    w2ui.formSelectionPrompt.render('#w2ui-popup #form');
-                    w2ui.formSelectionPrompt.resize();
-                }
-            },
-            onClose: function (event) {
-                XrmTranslator.UnlockGrid();
-            }
-        });
-    }
-
     function IdFilter (node) {
         if (node.id == this.id) {
             return NodeFilter.FILTER_ACCEPT;
@@ -589,71 +619,68 @@
             return DialogHelper.alert("Please select an entity before loading forms.");
         }
 
-        var formRequest = {
-            entityName: "systemform",
-            queryParams: query
-        };
-
-        var languages = XrmTranslator.installedLanguages.LocaleIds;
-        var initialLanguage = XrmTranslator.userSettings.uilanguageid;
-        var forms = [];
-        var requests = [];
-
-        for (var i = 0; i < languages.length; i++) {
-            requests.push({
-                action: "Update",
-                language: languages[i]
-            });
-
-            requests.push({
-                action: "Retrieve",
-                language: languages[i]
-            });
-        }
-
-        requests.push({
-            action: "Update",
-            language: initialLanguage
-        });
-
-        return WebApiClient.Promise.reduce(requests, function(total, request){
-            if (request.action === "Update") {
-                return WebApiClient.Update({
-                    overriddenSetName: "usersettingscollection",
-                    entityId: XrmTranslator.userId,
-                    entity: { uilanguageid: request.language }
-                })
-                .then(function(response) {
-                    return total;
-                });
-            }
-            else if (request.action === "Retrieve") {
-                return WebApiClient.Promise.props({
-                    forms: WebApiClient.Retrieve(formRequest),
-                    languageCode: request.language
-                })
-                .then(function (response) {
-                    total.push(response);
-
-                    return total;
-                });
-            }
-        }, [])
-        .then(function(responses) {
-            FormHandler.formsByLanguage = responses;
-
-            if (FormHandler.lastId) {
-                ProcessSelection(FormHandler.lastId);
-                FormHandler.lastId = null;
-            }
-            else {
-                ShowFormSelection();
-            }
+        return FormHandler.LoadAllForms()
+        .then(function(allFormData) {
+            FormHandler.lastId = null;
+            FillAllFormsTable(allFormData || []);
         })
         .catch(XrmTranslator.errorHandler);
     }
 
+    function SaveLoadedFormsOnly(skipLanguageScope) {
+        var grid = XrmTranslator.GetGrid();
+        var originalRecords = grid.records;
+        var originalTotal = grid.total;
+        var formGroups = deepClone(grid.records.filter(function(record) {
+            return record._isFormGroupNode && (!record.w2ui || !record.w2ui.parent_recid);
+        }));
+
+        var executeSave = function () {
+            var chain = WebApiClient.Promise.resolve();
+
+            for (var i = 0; i < FormHandler.loadedFormsData.length; i++) {
+                (function(formData) {
+                    chain = chain.then(function() {
+                        var group = formGroups.find(function(record) {
+                            return record.recid === formData.prefix + "_group";
+                        });
+
+                        if (!group || !group.w2ui || !group.w2ui.children || !hasChanges(group.w2ui.children)) {
+                            return;
+                        }
+
+                        var formRecords = deepClone(group.w2ui.children);
+                        stripPrefixFromRecords(formRecords, formData.prefix);
+
+                        XrmTranslator.metadata = deepClone(formData.metadata);
+                        FormHandler.selectedForms = formData.selectedForms ? formData.selectedForms.slice() : [];
+
+                        grid.records = formRecords;
+                        grid.total = formRecords.length;
+
+                        return FormHandler.SaveOnly(true);
+                    });
+                })(FormHandler.loadedFormsData[i]);
+            }
+
+            return chain.then(function() {
+                grid.records = originalRecords;
+                grid.total = originalTotal;
+            });
+        };
+
+        if (skipLanguageScope) {
+            return executeSave();
+        }
+
+        return XrmTranslator.RunAsBaseLanguage(executeSave);
+    }
+
     FormHandler.SaveOnly = function(skipLanguageScope) {
+        if (FormHandler.loadedFormsData && isFormGroupGrid(XrmTranslator.GetGrid().records)) {
+            return SaveLoadedFormsOnly(skipLanguageScope);
+        }
+
         var records = XrmTranslator.GetAllRecords();
         var formXml = GetParsedForm(XrmTranslator.metadata);
         var updates = GetUpdates(records);

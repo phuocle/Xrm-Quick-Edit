@@ -1268,10 +1268,12 @@
 
         if (searchInput) {
             searchInput.readOnly = false;
-            if (String(searchInput.value || "").trim().toLowerCase() === "null" || searchInput.value === " ") {
+            var searchValueText = String(searchInput.value || "").trim().toLowerCase();
+            if (searchValueText === "null" || searchValueText === "undefined" || searchInput.value === " ") {
                 searchInput.value = "";
             }
-            searchInput.placeholder = "Search All Fields";
+            searchInput.placeholder = "";
+            searchInput.removeAttribute("placeholder");
         }
 
         if (grid.last) {
@@ -1620,6 +1622,7 @@
                         matchedResults.push({
                             recid: record.recid,
                             targetRecid: record.recid,
+                            location: record.location,
                             schemaName: record.schemaName,
                             column: targetLcid,
                             source: source,

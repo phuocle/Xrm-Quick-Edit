@@ -271,6 +271,7 @@
                 translations.push({
                     recid: record.recid,
                     targetRecid: record.recid,
+                    location: record.location,
                     schemaName: record.schemaName,
                     column: destLcid,
                     source: record[fromLcid],
@@ -368,6 +369,7 @@
                 translations.push({
                     recid: record.recid,
                     targetRecid: record.recid,
+                    location: record.location,
                     schemaName: record.schemaName,
                     column: destLcid,
                     source: record[fromLcid],
@@ -629,10 +631,11 @@
                 show: { selectColumn: false },
                 multiSelect: false,
                 columns: [
-                    { field: 'schemaName', text: 'Schema Name', size: '25%', sortable: true, searchable: true },
+                    { field: 'location', text: 'Location', size: '28%', sortable: true, searchable: true },
+                    { field: 'schemaName', text: 'Schema Name', size: '18%', sortable: true, searchable: true },
                     { field: 'column', text: 'Column LCID', sortable: true, searchable: true, hidden: true },
-                    { field: 'source', text: 'Source Text', size: '25%', sortable: true, searchable: true },
-                    { field: 'translation', text: 'Translated Text', size: '25%', sortable: true, searchable: true, editable: { type: 'text' } },
+                    { field: 'source', text: 'Source Text', size: '21%', sortable: true, searchable: true },
+                    { field: 'translation', text: 'Translated Text', size: '21%', sortable: true, searchable: true, editable: { type: 'text' } },
                     {
                         field: 'fromDictionary',
                         text: 'From Dictionary',
@@ -952,7 +955,7 @@
                                 title: "Records to Translate",
                                 sourceLcid: sourceLcid,
                                 leafOnly: true,
-                                includeBranchRecords: XrmTranslator.GetType() === "bpf" || XrmTranslator.GetType() === "allInOne",
+                                includeBranchRecords: ["bpf", "forms", "dashboards", "allInOne"].indexOf(XrmTranslator.GetType()) !== -1,
                                 selectAllOnly: true,
                                 excludeEmptySource: translateMissingVal !== "overwrite",
                                 emptyMessage: translateMissingVal === "overwrite"

@@ -164,17 +164,19 @@
             if (!hasValidSearchName) {
                 searchInput.readOnly = false;
             }
-            if (String(searchInput.value || "").trim().toLowerCase() === "null" || (!hasValidSearchName && searchInput.value === " ")) {
+            var searchValueText = String(searchInput.value || "").trim().toLowerCase();
+            if (searchValueText === "null" || searchValueText === "undefined" || (!hasValidSearchName && searchInput.value === " ")) {
                 searchInput.value = "";
             }
-            searchInput.placeholder = "Search All Fields";
+            searchInput.placeholder = "";
+            searchInput.removeAttribute("placeholder");
         }
 
         if (grid.last) {
-            if (!grid.last.field || String(grid.last.field).toLowerCase() === "null") {
+            if (!grid.last.field || ["null", "undefined"].indexOf(String(grid.last.field).toLowerCase()) !== -1) {
                 grid.last.field = "all";
             }
-            if (!grid.last.label || String(grid.last.label).toLowerCase() === "null") {
+            if (!grid.last.label || ["null", "undefined"].indexOf(String(grid.last.label).toLowerCase()) !== -1) {
                 grid.last.label = "All Fields";
             }
         }
@@ -1066,7 +1068,38 @@
         });
     }
 
-    function getRecordSelectorLeafRecords(records) {
+    function getRecordSelectorLocationLabel(record) {
+        if (!record || record.w2ui && record.w2ui.summary) {
+            return "";
+        }
+
+        return String(record.schemaName || "").trim();
+    }
+
+    function shouldIncludeRecordSelectorLocation(record) {
+        if (!record) {
+            return false;
+        }
+
+        var label = getRecordSelectorLocationLabel(record);
+        if (!label) {
+            return false;
+        }
+
+        // Skip top-level All-In-One buckets such as "3. Forms"; keep actual form names.
+        return !record._isGroupNode || !/^\d+\.\s/.test(label);
+    }
+
+    function getRecordSelectorChildLocation(location, record) {
+        if (!shouldIncludeRecordSelectorLocation(record)) {
+            return location;
+        }
+
+        var label = getRecordSelectorLocationLabel(record);
+        return location ? location + " > " + label : label;
+    }
+
+    function getRecordSelectorLeafRecords(records, location) {
         var result = [];
 
         records.forEach(function(record) {
@@ -1074,12 +1107,15 @@
                 return;
             }
 
+            var childLocation = getRecordSelectorChildLocation(location || "", record);
+
             if (record.w2ui && Array.isArray(record.w2ui.children) && record.w2ui.children.length > 0) {
-                result = result.concat(getRecordSelectorLeafRecords(record.w2ui.children));
+                result = result.concat(getRecordSelectorLeafRecords(record.w2ui.children, childLocation));
                 return;
             }
 
             if (!record._isGroupNode) {
+                record.location = location || "";
                 result.push(record);
             }
         });
@@ -1087,7 +1123,7 @@
         return result;
     }
 
-    function getRecordSelectorTranslationRecords(records, includeBranchRecords) {
+    function getRecordSelectorTranslationRecords(records, includeBranchRecords, location) {
         var result = [];
 
         records.forEach(function(record) {
@@ -1097,17 +1133,21 @@
 
             var hasChildren = record.w2ui && Array.isArray(record.w2ui.children) && record.w2ui.children.length > 0;
             var hasSource = hasRecordSelectorText(record.sourceText);
+            var currentLocation = location || "";
+            var childLocation = getRecordSelectorChildLocation(currentLocation, record);
 
             if (includeBranchRecords && hasChildren && !record._isGroupNode && hasSource) {
+                record.location = currentLocation;
                 result.push(record);
             }
 
             if (hasChildren) {
-                result = result.concat(getRecordSelectorTranslationRecords(record.w2ui.children, includeBranchRecords));
+                result = result.concat(getRecordSelectorTranslationRecords(record.w2ui.children, includeBranchRecords, childLocation));
                 return;
             }
 
             if (!record._isGroupNode) {
+                record.location = currentLocation;
                 result.push(record);
             }
         });
@@ -1116,7 +1156,7 @@
     }
 
     function trimRecordSelectorDisplayValues(record) {
-        ["schemaName", "sourceText"].forEach(function(field) {
+        ["schemaName", "sourceText", "location"].forEach(function(field) {
             if (record[field] !== null && typeof record[field] !== "undefined") {
                 record[field] = String(record[field]).trim();
             }
@@ -1154,8 +1194,9 @@
                 multiSelect: !selectAllOnly,
                 _xqtSelectAllOnly: selectAllOnly,
                 columns: [
-                    { field: 'schemaName', text: 'Schema Name', size: '30%', sortable: true, searchable: true },
-                    { field: 'sourceText', text: 'Source Text', size: '70%', sortable: true, searchable: true }
+                    { field: 'location', text: 'Location', size: '40%', sortable: true, searchable: true },
+                    { field: 'schemaName', text: 'Schema Name', size: '25%', sortable: true, searchable: true },
+                    { field: 'sourceText', text: 'Source Text', size: '35%', sortable: true, searchable: true }
                 ],
                 records: [],
                 onSelect: function(event) {
