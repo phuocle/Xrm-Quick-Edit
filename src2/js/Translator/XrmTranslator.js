@@ -1040,7 +1040,9 @@
         }
 
         var callback = ResolveRecordSelectorCallback(context.callbackName);
-        var selectedRecords = XrmTranslator.GetManyByRecId(null, w2ui.recordSelectorGrid.getSelection());
+        var selectedRecords = context.selectAllOnly
+            ? (context.records || [])
+            : XrmTranslator.GetManyByRecId(null, w2ui.recordSelectorGrid.getSelection());
         var callbackParameters = context.callbackParameters || [];
 
         w2popup.close();
@@ -1050,14 +1052,107 @@
         }
     };
 
+    function getRecordSelectorRootRecords() {
+        var selectorSourceRecords = unfilteredRecords || XrmTranslator.GetGrid().records;
+
+        return selectorSourceRecords.filter(function(r) {
+            if (r.w2ui && r.w2ui.summary) {
+                return false;
+            }
+
+            // Expanded w2ui tree rows are also inserted into grid.records with
+            // parent_recid. Use root rows only, then traverse w2ui.children.
+            return !r.w2ui || !r.w2ui.parent_recid;
+        });
+    }
+
+    function getRecordSelectorLeafRecords(records) {
+        var result = [];
+
+        records.forEach(function(record) {
+            if (record.w2ui && record.w2ui.summary) {
+                return;
+            }
+
+            if (record.w2ui && Array.isArray(record.w2ui.children) && record.w2ui.children.length > 0) {
+                result = result.concat(getRecordSelectorLeafRecords(record.w2ui.children));
+                return;
+            }
+
+            if (!record._isGroupNode) {
+                result.push(record);
+            }
+        });
+
+        return result;
+    }
+
+    function getRecordSelectorTranslationRecords(records, includeBranchRecords) {
+        var result = [];
+
+        records.forEach(function(record) {
+            if (record.w2ui && record.w2ui.summary) {
+                return;
+            }
+
+            var hasChildren = record.w2ui && Array.isArray(record.w2ui.children) && record.w2ui.children.length > 0;
+            var hasSource = hasRecordSelectorText(record.sourceText);
+
+            if (includeBranchRecords && hasChildren && !record._isGroupNode && hasSource) {
+                result.push(record);
+            }
+
+            if (hasChildren) {
+                result = result.concat(getRecordSelectorTranslationRecords(record.w2ui.children, includeBranchRecords));
+                return;
+            }
+
+            if (!record._isGroupNode) {
+                result.push(record);
+            }
+        });
+
+        return result;
+    }
+
+    function trimRecordSelectorDisplayValues(record) {
+        ["schemaName", "sourceText"].forEach(function(field) {
+            if (record[field] !== null && typeof record[field] !== "undefined") {
+                record[field] = String(record[field]).trim();
+            }
+        });
+
+        return record;
+    }
+
+    function prepareRecordSelectorLeafRecord(record) {
+        trimRecordSelectorDisplayValues(record);
+
+        if (record.w2ui) {
+            delete record.w2ui.children;
+            delete record.w2ui.parent_recid;
+            delete record.w2ui.expanded;
+            delete record.w2ui.hideCheckBox;
+            delete record.w2ui.summary;
+        }
+
+        return record;
+    }
+
     XrmTranslator.ShowRecordSelector = function (callbackName, callbackParameters, preselectedRecords, recordFilter, options) {
         options = options || {};
+        var selectAllOnly = !!options.selectAllOnly;
+
+        if (w2ui.recordSelectorGrid && w2ui.recordSelectorGrid._xqtSelectAllOnly !== selectAllOnly) {
+            w2ui.recordSelectorGrid.destroy();
+        }
 
         if (!w2ui.recordSelectorGrid) {
             new w2grid({
                 name: 'recordSelectorGrid',
-                show: { selectColumn: true },
-                multiSelect: true,
+                show: { selectColumn: !selectAllOnly },
+                multiSelect: !selectAllOnly,
+                _xqtSelectAllOnly: selectAllOnly,
                 columns: [
                     { field: 'schemaName', text: 'Schema Name', size: '30%', sortable: true, searchable: true },
                     { field: 'sourceText', text: 'Source Text', size: '70%', sortable: true, searchable: true }
@@ -1092,12 +1187,12 @@
                     event.preventDefault();
                 }
             });
+            w2ui.recordSelectorGrid._xqtSelectAllOnly = selectAllOnly;
         }
 
         w2ui.recordSelectorGrid.reset(true);
         w2ui.recordSelectorGrid.clear();
-        var selectorSourceRecords = unfilteredRecords || XrmTranslator.GetGrid().records;
-        var allRecords = JSON.parse(JSON.stringify(selectorSourceRecords)).map(removeHideCheckBoxFlag);
+        var allRecords = JSON.parse(JSON.stringify(getRecordSelectorRootRecords())).map(removeHideCheckBoxFlag);
 
         var sourceLang = options.sourceLcid ? String(options.sourceLcid) : (XrmTranslator.baseLanguage ? XrmTranslator.baseLanguage.toString() : null);
         if (sourceLang) {
@@ -1116,7 +1211,19 @@
         }
 
         var filteredRecords;
-        if (recordFilter) {
+        if (options.leafOnly) {
+            var selectorRecords = options.includeBranchRecords
+                ? getRecordSelectorTranslationRecords(allRecords, true)
+                : getRecordSelectorLeafRecords(allRecords);
+
+            filteredRecords = selectorRecords.filter(function(r) {
+                if (options.excludeEmptySource && !hasRecordSelectorText(r.sourceText)) {
+                    return false;
+                }
+
+                return recordFilter ? recordFilter(r) : true;
+            }).map(prepareRecordSelectorLeafRecord);
+        } else if (recordFilter) {
             var filterRecursive = function(records) {
                 return records.filter(function(r) {
                     var hasChildren = r.w2ui && Array.isArray(r.w2ui.children);
@@ -1142,6 +1249,12 @@
             filteredRecords = allRecords;
         }
 
+        filteredRecords.forEach(function(record) {
+            if (!record.w2ui || !Array.isArray(record.w2ui.children)) {
+                trimRecordSelectorDisplayValues(record);
+            }
+        });
+
         if (recordFilter && filteredRecords.length === 0) {
             w2alert(options.emptyMessage || "No matching records found. All records already have translations for the target language.");
             return;
@@ -1152,21 +1265,27 @@
 
         recordSelectorContext = {
             callbackName: callbackName,
-            callbackParameters: callbackParameters || []
+            callbackParameters: callbackParameters || [],
+            records: filteredRecords,
+            selectAllOnly: selectAllOnly
         };
 
         w2popup.open({
-            title   : 'Select Records',
+            title   : options.title || (selectAllOnly ? 'Records to Translate' : 'Select Records'),
             buttons   : '<button class="w2ui-btn" onclick="w2popup.close();">Cancel</button> '+
-                        '<button class="w2ui-btn" onclick="XrmTranslator.ApplyRecordSelectorSelection();">Ok</button>',
+                        '<button class="w2ui-btn" onclick="XrmTranslator.ApplyRecordSelectorSelection();">OK</button>',
             width   : 900,
             height  : 600,
-            showMax : true,
+            showMax : false,
             body    : '<div id="main" style="position: absolute; left: 5px; top: 5px; right: 5px; bottom: 5px;"></div>',
             onOpen  : function (event) {
                 event.onComplete = function () {
                     w2ui.recordSelectorGrid.render('#w2ui-popup #main');
                     w2ui.recordSelectorGrid.records.slice().forEach(function(r) { w2ui.recordSelectorGrid.expand(r.recid); });
+
+                    if (selectAllOnly) {
+                        return;
+                    }
 
                     if (preselectedRecords && preselectedRecords.length > 0) {
                         for (let i = 0; i < preselectedRecords.length; i++) {

@@ -431,10 +431,12 @@
             }
         }
 
-        for (var i = 0; i < selected.length; i++) {
-            var select = selected[i];
+        var selectedResults = selected && selected.length
+            ? selected.map(function(select) { return XrmTranslator.GetByRecId(results, select); }).filter(function(result) { return !!result; })
+            : (results || []);
 
-            var result = XrmTranslator.GetByRecId(results, select);
+        for (var i = 0; i < selectedResults.length; i++) {
+            var result = selectedResults[i];
             if (!result) {
                 continue;
             }
@@ -624,8 +626,8 @@
         if (!w2ui.translationResultGrid) {
             new w2grid({
                 name: 'translationResultGrid',
-                show: { selectColumn: true },
-                multiSelect: true,
+                show: { selectColumn: false },
+                multiSelect: false,
                 columns: [
                     { field: 'schemaName', text: 'Schema Name', size: '25%', sortable: true, searchable: true },
                     { field: 'column', text: 'Column LCID', sortable: true, searchable: true, hidden: true },
@@ -653,15 +655,14 @@
         w2popup.open({
             title   : 'Apply Translation Results',
             buttons   : '<button class="w2ui-btn" onclick="w2popup.close();">Cancel</button> '+
-                        '<button class="w2ui-btn" onclick="TranslationHandler.ApplyTranslations(w2ui.translationResultGrid.getSelection(), w2ui.translationResultGrid.records); w2popup.close();">Apply</button>',
+                        '<button class="w2ui-btn" onclick="TranslationHandler.ApplyTranslations(null, w2ui.translationResultGrid.records); w2popup.close();">Apply</button>',
             width   : 900,
             height  : 600,
-            showMax : true,
+            showMax : false,
             body    : '<div id="main" style="position: absolute; left: 5px; top: 5px; right: 5px; bottom: 5px;"></div>',
             onOpen  : function (event) {
                 event.onComplete = function () {
                     w2ui.translationResultGrid.render('#w2ui-popup #main');
-                    w2ui.translationResultGrid.selectAll();
                 };
             },
             onToggle: function (event) {
@@ -933,14 +934,9 @@
                         });
 
                         var recordFilter = null;
-                        if (translateMissingVal) {
+                        if (translateMissingVal && translateMissingVal !== "overwrite") {
                             recordFilter = function(record) {
                                 var targetVal = GetCurrentGridValue(record, targetLcid);
-                                var sourceVal = GetCurrentGridValue(record, sourceLcid);
-
-                                if (translateMissingVal === "overwrite") {
-                                    return true;
-                                }
 
                                 // "missing" - only records without target translation
                                 return !HasTranslationText(targetVal);
@@ -953,7 +949,11 @@
                             (XrmTranslator.GetGrid().getSelection() || []),
                             recordFilter,
                             {
+                                title: "Records to Translate",
                                 sourceLcid: sourceLcid,
+                                leafOnly: true,
+                                includeBranchRecords: XrmTranslator.GetType() === "bpf" || XrmTranslator.GetType() === "allInOne",
+                                selectAllOnly: true,
                                 excludeEmptySource: translateMissingVal !== "overwrite",
                                 emptyMessage: translateMissingVal === "overwrite"
                                     ? "No records with source text found for the selected source language."
