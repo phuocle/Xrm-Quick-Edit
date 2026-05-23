@@ -187,8 +187,8 @@
      *     Each stage and field in a BPF has the same label structure in XAML:
      *
      *     <sco:Collection x:TypeArguments="mcwo:StepLabel" x:Key="StepLabels">
-     *         <mcwo:StepLabel Description="Stage A" LabelId="GUID" LanguageCode="1033" />
-     *         <mcwo:StepLabel Description="Giai đoạn A" LabelId="GUID" LanguageCode="1066" />
+     *         <mcwo:StepLabel Description="Stage A" LabelId="GUID" LanguageCode="{base LCID}" />
+     *         <mcwo:StepLabel Description="Translated Stage A" LabelId="GUID" LanguageCode="{target LCID}" />
      *     </sco:Collection>
      *     <x:String x:Key="StageId">GUID</x:String>           ← for stages
      *     <x:String x:Key="ProcessStepId">GUID</x:String>     ← for step fields

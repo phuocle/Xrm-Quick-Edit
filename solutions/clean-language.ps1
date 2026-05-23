@@ -1,22 +1,30 @@
 <#
 .SYNOPSIS
-    Removes all non-English (non-1033) language entries from unpacked Dataverse solution XML files.
+    Removes all non-base-language entries from unpacked Dataverse solution XML files.
 
 .DESCRIPTION
     Processes all XML files in an unpacked solution folder and:
-    1. Removes elements with languagecode attribute != 1033
-    2. Removes elements with LCID attribute != 1033 (SiteMap)
-    3. Cleans <Languages> block to keep only 1033
+    1. Removes elements with languagecode attribute != BaseLanguageCode
+    2. Removes elements with LCID attribute != BaseLanguageCode (SiteMap)
+    3. Cleans <Languages> block to keep only BaseLanguageCode
 
 .PARAMETER Path
     Path to the unpacked solution folder.
+
+.PARAMETER BaseLanguageCode
+    Dataverse organization base language LCID to keep, for example 1033 or 1041.
 #>
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Path
+    [string]$Path,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateRange(1, 999999)]
+    [int]$BaseLanguageCode
 )
 
 $ErrorActionPreference = "Stop"
+$baseLanguageCodeText = [string]$BaseLanguageCode
 
 if (-not (Test-Path $Path)) {
     Write-Error "Path not found: $Path"
@@ -30,8 +38,8 @@ foreach ($file in $xmlFiles) {
     $modified = $false
     [xml]$xml = Get-Content -Path $file.FullName -Raw -Encoding UTF8
 
-    # 1. Remove elements with languagecode != 1033
-    $langNodes = $xml.SelectNodes("//*[@languagecode and @languagecode!='1033']")
+    # 1. Remove elements with languagecode != base language
+    $langNodes = $xml.SelectNodes("//*[@languagecode and @languagecode!='$baseLanguageCodeText']")
     if ($langNodes -and $langNodes.Count -gt 0) {
         foreach ($node in $langNodes) {
             $node.ParentNode.RemoveChild($node) | Out-Null
@@ -39,8 +47,8 @@ foreach ($file in $xmlFiles) {
         $modified = $true
     }
 
-    # 2. Remove elements with LCID != 1033 (SiteMap)
-    $lcidNodes = $xml.SelectNodes("//*[@LCID and @LCID!='1033']")
+    # 2. Remove elements with LCID != base language (SiteMap)
+    $lcidNodes = $xml.SelectNodes("//*[@LCID and @LCID!='$baseLanguageCodeText']")
     if ($lcidNodes -and $lcidNodes.Count -gt 0) {
         foreach ($node in $lcidNodes) {
             $node.ParentNode.RemoveChild($node) | Out-Null
@@ -48,11 +56,11 @@ foreach ($file in $xmlFiles) {
         $modified = $true
     }
 
-    # 3. Clean <Languages> block — keep only 1033
+    # 3. Clean <Languages> block: keep only base language
     $languageNodes = $xml.SelectNodes("//Languages/Language")
     if ($languageNodes -and $languageNodes.Count -gt 0) {
         foreach ($node in $languageNodes) {
-            if ($node.InnerText.Trim() -ne "1033") {
+            if ($node.InnerText.Trim() -ne $baseLanguageCodeText) {
                 $node.ParentNode.RemoveChild($node) | Out-Null
                 $modified = $true
             }
@@ -75,4 +83,4 @@ foreach ($file in $xmlFiles) {
 }
 
 Write-Host ""
-Write-Host "Done. Cleaned $totalCleaned file(s). Only English (1033) remains."
+Write-Host "Done. Cleaned $totalCleaned file(s). Only base language ($baseLanguageCodeText) remains."
