@@ -1207,6 +1207,85 @@
         }
     }
 
+    function removeDictionarySearchPanel(gridBox) {
+        var searchPanels = gridBox.querySelectorAll(".w2ui-grid-searches");
+        for (var i = 0; i < searchPanels.length; i++) {
+            searchPanels[i].remove();
+        }
+    }
+
+    function configureSimpleDictionarySearch(grid) {
+        if (!grid || grid._xqtSimpleSearchConfigured) {
+            return;
+        }
+
+        if (grid.defaultOperator) {
+            grid.defaultOperator.text = "contains";
+        }
+        if (grid.show) {
+            grid.show.searchLogic = false;
+            grid.show.searchSave = false;
+            grid.show.toolbarReload = false;
+        }
+
+        grid.searchOpen = function () {};
+        grid.searchShowFields = function () {};
+        grid.searchSuggest = function () {};
+        grid._xqtSimpleSearchConfigured = true;
+    }
+
+    function normalizeDictionarySearchUi() {
+        var grid = w2ui && w2ui.translationDictionaryGrid ? w2ui.translationDictionaryGrid : null;
+        var gridBox = grid && grid.box ? grid.box : null;
+        if (!grid || !gridBox || !grid.name) {
+            return;
+        }
+
+        configureSimpleDictionarySearch(grid);
+        removeDictionarySearchPanel(gridBox);
+
+        if (grid.toolbar) {
+            if (grid.toolbar.get("w2ui-reload")) {
+                grid.toolbar.remove("w2ui-reload");
+            }
+            if (grid.toolbar.get("w2ui-search-advanced")) {
+                grid.toolbar.remove("w2ui-search-advanced");
+            }
+        }
+
+        var searchName = gridBox.querySelector("#grid_" + grid.name + "_search_name");
+        var searchInput = gridBox.querySelector("#grid_" + grid.name + "_search_all");
+        var nameText = searchName ? searchName.querySelector(".name-text") : null;
+
+        if (searchName) {
+            searchName.style.display = "none";
+        }
+        if (nameText) {
+            nameText.textContent = "";
+        }
+
+        grid.searchSelected = null;
+
+        if (searchInput) {
+            searchInput.readOnly = false;
+            if (String(searchInput.value || "").trim().toLowerCase() === "null" || searchInput.value === " ") {
+                searchInput.value = "";
+            }
+            searchInput.placeholder = "Search All Fields";
+        }
+
+        if (grid.last) {
+            grid.last.field = "all";
+            grid.last.label = "All Fields";
+        }
+    }
+
+    function normalizeDictionarySearchUiSoon() {
+        normalizeDictionarySearchUi();
+        setTimeout(normalizeDictionarySearchUi, 0);
+        setTimeout(normalizeDictionarySearchUi, 50);
+    }
+
     function ensureDictionaryGrid(context) {
         if (w2ui.translationDictionaryGrid) {
             w2ui.translationDictionaryGrid.destroy();
@@ -1218,7 +1297,7 @@
         var targetSize = targetCount > 0 ? (100 - sourceSize - activeSize) / targetCount : 0;
 
         var columns = [
-            { field: "sourceText", text: "Source " + context.baseName, size: sourceSize + "%", sortable: true, editable: { type: "text" } }
+            { field: "sourceText", text: "Source " + context.baseName, size: sourceSize + "%", sortable: true, searchable: true, editable: { type: "text" } }
         ];
 
         for (var i = 0; i < context.targetLanguages.length; i++) {
@@ -1228,20 +1307,29 @@
                 text: "Target " + target.name,
                 size: targetSize.toFixed(2) + "%",
                 sortable: true,
+                searchable: true,
                 editable: { type: "text" }
             });
         }
 
-        columns.push({ field: "isActive", text: "Active", size: activeSize + "%", sortable: true, editable: { type: "checkbox" } });
+        columns.push({ field: "isActive", text: "Active", size: activeSize + "%", sortable: true, searchable: true, editable: { type: "checkbox" } });
 
         new w2grid({
             name: "translationDictionaryGrid",
             show: {
                 toolbar: true,
                 footer: true,
-                selectColumn: true
+                selectColumn: true,
+                toolbarSearch: true,
+                toolbarReload: false,
+                searchLogic: false,
+                searchSave: false
             },
+            multiSearch: false,
             multiSelect: true,
+            searches: columns.map(function (column) {
+                return { field: column.field, text: column.text, type: "text", operator: "contains" };
+            }),
             toolbar: {
                 items: [
                     { id: "delete", type: "button", text: "Delete", icon: "w2ui-icon-cross" },
@@ -1272,9 +1360,14 @@
                     ensureDictionaryInputRow(w2ui.translationDictionaryGrid, dictionaryGridContext);
                 };
             },
+            onSearch: function (event) {
+                event.onComplete = normalizeDictionarySearchUiSoon;
+            },
             columns: columns,
             records: []
         });
+
+        configureSimpleDictionarySearch(w2ui.translationDictionaryGrid);
 
         return w2ui.translationDictionaryGrid;
     }
@@ -1387,6 +1480,7 @@
                     onOpen: function (event) {
                         event.onComplete = function () {
                             w2ui.translationDictionaryGrid.render("#w2ui-popup #dictionary-main");
+                            normalizeDictionarySearchUiSoon();
                             setTimeout(function () { w2popup.max(); }, 100);
                         };
                     },

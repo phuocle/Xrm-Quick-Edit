@@ -1,11 +1,9 @@
 (function (DialogHelper, undefined) {
     "use strict";
 
-    var iconStyle = "font-size: 28px; margin-right: 15px; flex-shrink: 0;";
-
     var icons = {
-        alert: '<span style="' + iconStyle + ' color: #4285f4;">&#9432;</span>',
-        confirm: '<span style="' + iconStyle + ' color: #e6a817;">&#9888;</span>',
+        alert: '<span class="xqt-dialog-icon xqt-dialog-icon-alert">&#9432;</span>',
+        confirm: '<span class="xqt-dialog-icon xqt-dialog-icon-confirm">&#9888;</span>',
         question: ''
     };
 
@@ -16,9 +14,9 @@
     }
 
     function buildBody(type, message) {
-        return '<div style="padding: 20px 25px; display: flex; align-items: flex-start;">' +
+        return '<div class="xqt-dialog-body xqt-dialog-body-' + type + '">' +
                (icons[type] || '') +
-               '<span style="flex: 1; word-wrap: break-word;">' + escapeHtml(message) + '</span>' +
+               '<span class="xqt-dialog-message">' + escapeHtml(message) + '</span>' +
                '</div>';
     }
 
@@ -39,6 +37,21 @@
                 height: options.height || 220,
                 modal: true,
                 showClose: true,
+                showMax: false,
+                style: options.style || "",
+                onOpen: function (event) {
+                    event.onComplete = function () {
+                        var popup = document.querySelector("#w2ui-popup");
+                        if (!popup) {
+                            return;
+                        }
+
+                        popup.classList.add("xqt-dialog-popup");
+                        if (options.popupClass) {
+                            popup.classList.add(options.popupClass);
+                        }
+                    };
+                },
                 onClose: function () {
                     DialogHelper._resolve = null;
                     resolve(result);

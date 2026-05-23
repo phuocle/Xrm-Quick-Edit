@@ -718,10 +718,6 @@
                 return !HasTranslationText(targetVal);
             }
 
-            if (mode === "missingOrIdentical") {
-                return !HasTranslationText(targetVal) || NormalizeTranslationText(sourceVal) === NormalizeTranslationText(targetVal);
-            }
-
             if (mode === "overwrite") {
                 return true;
             }
@@ -847,7 +843,6 @@
         var saved = GetSavedTranslationPrompt();
         var translateMissingItems = [
             { id: "missing", text: "All Missing" },
-            { id: "missingOrIdentical", text: "All Missing Or Identical" },
             { id: "overwrite", text: "All Overwrite" }
         ];
         var apiProviderItems = GetTranslationProviderItems();
@@ -945,10 +940,6 @@
 
                                 if (translateMissingVal === "overwrite") {
                                     return true;
-                                }
-
-                                if (translateMissingVal === "missingOrIdentical") {
-                                    return !HasTranslationText(targetVal) || NormalizeTranslationText(sourceVal) === NormalizeTranslationText(targetVal);
                                 }
 
                                 // "missing" - only records without target translation
@@ -1153,14 +1144,7 @@
                 style   : 'padding: 15px 0px 0px 0px',
                 width   : 650,
                 height  : 420,
-                showMax : true,
-                onToggle: function (event) {
-                    w2ui.aiSettings.box.style.display = 'none';
-                    event.onComplete = function () {
-                        w2ui.aiSettings.box.style.display = '';
-                        w2ui.aiSettings.resize();
-                    }
-                },
+                showMax : false,
                 onOpen: function (event) {
                     event.onComplete = function () {
                         w2ui.aiSettings.render('#w2ui-popup #form');
@@ -1173,20 +1157,23 @@
     TranslationHandler.ShowApplyDictionaryPrompt = function() {
         var applyModeItems = [
             { id: "overwrite", text: "All Overwrite" },
-            { id: "missing", text: "All Missing" },
-            { id: "missingOrIdentical", text: "All Missing Or Identical" }
+            { id: "missing", text: "All Missing" }
         ];
+
+        if (w2ui.applyDictionaryPrompt) {
+            w2ui.applyDictionaryPrompt.destroy();
+        }
 
         if (!w2ui.applyDictionaryPrompt) {
             new w2form({
                 name: 'applyDictionaryPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0" style="padding: 15px 25px;">'+
-                    '    <p style="margin: 0 0 15px 0; color: #555;">Apply existing dictionary entries to all matching records in the current grid.</p>'+
-                    '    <div style="display: flex; align-items: center;">'+
-                    '        <label style="min-width: 80px; white-space: nowrap;">Mode:</label>'+
-                    '        <input name="applyMode" type="list" style="flex: 1; width: 100%;"/>'+
+                    '<div class="w2ui-page page-0 xqt-apply-dictionary-form">'+
+                    '    <p class="xqt-apply-dictionary-description">Apply existing dictionary entries to all matching records in the current grid.</p>'+
+                    '    <div class="xqt-apply-dictionary-row">'+
+                    '        <label class="xqt-apply-dictionary-label" for="applyMode">Mode:</label>'+
+                    '        <div class="xqt-apply-dictionary-control"><input name="applyMode" type="list" /></div>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -1211,29 +1198,20 @@
                     }
                 }
             });
-        } else {
-            w2ui.applyDictionaryPrompt.record = { applyMode: applyModeItems[0] };
-            w2ui.applyDictionaryPrompt.refresh();
         }
 
         w2popup.open({
             title   : 'Apply Dictionary',
             name    : 'applyDictionaryPopup',
-            body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
-            style   : 'padding: 15px 0px 0px 0px',
-            width   : 520,
-            height  : 220,
+            body    : '<div id="form" class="xqt-apply-dictionary-popup-form"></div>',
+            style   : 'padding: 0px; overflow-x: hidden;',
+            width   : 620,
+            height  : 230,
             showMax : false,
-            onToggle: function (event) {
-                w2ui.applyDictionaryPrompt.box.style.display = 'none';
-                event.onComplete = function () {
-                    w2ui.applyDictionaryPrompt.box.style.display = '';
-                    w2ui.applyDictionaryPrompt.resize();
-                }
-            },
             onOpen: function (event) {
                 event.onComplete = function () {
                     w2ui.applyDictionaryPrompt.render('#w2ui-popup #form');
+                    w2ui.applyDictionaryPrompt.resize();
                 }
             }
         });
@@ -1275,7 +1253,6 @@
                     if (!HasTranslationText(sourceVal)) return false;
 
                     if (mode === "missing") return !HasTranslationText(targetVal);
-                    if (mode === "missingOrIdentical") return !HasTranslationText(targetVal) || NormalizeTranslationText(sourceVal) === NormalizeTranslationText(targetVal);
                     return true; // overwrite
                 });
 

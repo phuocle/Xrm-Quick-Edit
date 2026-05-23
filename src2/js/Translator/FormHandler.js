@@ -241,6 +241,41 @@
     // Expose ProcessSelection for AllInOneHandler
     FormHandler.ProcessSelection = ProcessSelection;
 
+    function GetCleanText(value) {
+        if (value === null || typeof value === "undefined") {
+            return "";
+        }
+
+        return String(value).trim();
+    }
+
+    function IsNoneEntity(entityName) {
+        return !entityName || String(entityName).toLowerCase() === "none";
+    }
+
+    function IsDashboardMode() {
+        return XrmTranslator.GetType && XrmTranslator.GetType() === "dashboards";
+    }
+
+    function GetFormQuery(entityName) {
+        if (IsDashboardMode()) {
+            return "?$filter=formactivationstate eq 1 and iscustomizable/Value eq true and (type eq 0 or type eq 10)";
+        }
+
+        if (IsNoneEntity(entityName)) {
+            return null;
+        }
+
+        return "?$filter=objecttypecode eq '" + entityName.toLowerCase() + "' and iscustomizable/Value eq true and formactivationstate eq 1 and type ne 0 and type ne 10";
+    }
+
+    function GetFormDisplayText(form, formTypeMap) {
+        var formTypeName = formTypeMap[form.type] || ("Type " + form.type);
+        var name = GetCleanText(form.name) || GetCleanText(form.objecttypecode) || "Unnamed Form";
+
+        return name + " [" + formTypeName + "]";
+    }
+
     // Load all forms without showing picker dialog — used by AllInOneHandler
     FormHandler.LoadAllForms = function () {
         var entityName = XrmTranslator.GetEntity();
@@ -256,9 +291,16 @@
             12: "Card"
         };
 
+        var query = GetFormQuery(entityName);
+
+        if (!query) {
+            XrmTranslator.UnlockGrid();
+            return DialogHelper.alert("Please select an entity before loading forms.");
+        }
+
         var formRequest = {
             entityName: "systemform",
-            queryParams: "?$filter=objecttypecode eq '" + entityName.toLowerCase() + "' and iscustomizable/Value eq true and formactivationstate eq 1"
+            queryParams: query
         };
 
         var languages = XrmTranslator.installedLanguages.LocaleIds;
@@ -342,10 +384,10 @@
                 name: 'formSelectionPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0" style="padding: 20px 25px;">'+
-                    '    <div style="display: flex; align-items: center;">'+
-                    '        <label style="margin-right: 10px; white-space: nowrap;">Form: <span style="color: red;">*</span></label>'+
-                    '        <input name="formSelection" type="list" style="flex: 1; width: 100%;" />'+
+                    '<div class="w2ui-page page-0 xqt-form-selection-form">'+
+                    '    <div class="xqt-form-selection-row">'+
+                    '        <label class="xqt-form-selection-label" for="formSelection">Form: <span class="xqt-required">*</span></label>'+
+                    '        <div class="xqt-form-selection-control"><input name="formSelection" type="list" /></div>'+
                     '    </div>'+
                     '</div>'+
                     '<div class="w2ui-buttons">'+
@@ -353,7 +395,7 @@
                     '    <button class="w2ui-btn" name="ok">Ok</button>'+
                     '</div>',
                 fields: [
-                    { field: 'formSelection', type: 'list', required: true, html: {attr: 'style="width: 100%"'} }
+                    { field: 'formSelection', type: 'list', required: true }
                 ],
                 actions: {
                     "ok": function () {
@@ -388,11 +430,10 @@
 
         for (var i = 0; i < userLanguageForms.length; i++) {
             var form = userLanguageForms[i];
-            var formTypeName = formTypeMap[form.type] || ("Type " + form.type);
 
             formItems.push({
                 id: form.formid,
-                text: form.name + " - " + (form.description || "") + " [" + formTypeName + "]"
+                text: GetFormDisplayText(form, formTypeMap)
             });
         }
 
@@ -402,22 +443,16 @@
         w2popup.open({
             title   : 'Choose Form',
             name    : 'formSelectionPopup',
-            body    : '<div id="form" style="width: 100%; height: 100%;"></div>',
-            style   : 'padding: 15px 0px 0px 0px',
+            body    : '<div id="form" class="xqt-form-selection-popup-form"></div>',
+            style   : 'padding: 0px; overflow-x: hidden;',
             width   : 650,
-            height  : 250,
-            showMax : true,
-            onToggle: function (event) {
-                w2ui.formSelectionPrompt.box.style.display = 'none';
-                event.onComplete = function () {
-                    w2ui.formSelectionPrompt.box.style.display = '';
-                    w2ui.formSelectionPrompt.resize();
-                }
-            },
+            height  : 220,
+            showMax : false,
             onOpen: function (event) {
                 event.onComplete = function () {
                     // specifying an onOpen handler instead is equivalent to specifying an onBeforeOpen handler, which would make this code execute too early and hence not deliver.
                     w2ui.formSelectionPrompt.render('#w2ui-popup #form');
+                    w2ui.formSelectionPrompt.resize();
                 }
             },
             onClose: function (event) {
@@ -498,7 +533,12 @@
 
         return DialogHelper.confirm(
             "This will remove ALL overridden attribute labels on this form and reset them to the default attribute labels. This action cannot be undone.\n\nDo you want to continue?",
-            { title: "Remove Overridden Labels" }
+            {
+                title: "Remove Overridden Labels",
+                width: 620,
+                height: 270,
+                popupClass: "xqt-remove-overridden-confirm"
+            }
         )
         .then(function(confirmed) {
             if (!confirmed) {
@@ -542,15 +582,17 @@
 
     FormHandler.Load = function () {
         var entityName = XrmTranslator.GetEntity();
+        var query = GetFormQuery(entityName);
+
+        if (!query) {
+            XrmTranslator.UnlockGrid();
+            return DialogHelper.alert("Please select an entity before loading forms.");
+        }
 
         var formRequest = {
             entityName: "systemform",
-            queryParams: "?$filter=objecttypecode eq '" + entityName.toLowerCase() + "' and iscustomizable/Value eq true and formactivationstate eq 1"
+            queryParams: query
         };
-
-        if (entityName.toLowerCase() === "none") {
-            formRequest.queryParams = "?$filter=formactivationstate eq 1 and iscustomizable/Value eq true and (type eq 0 or type eq 10)"
-        }
 
         var languages = XrmTranslator.installedLanguages.LocaleIds;
         var initialLanguage = XrmTranslator.userSettings.uilanguageid;

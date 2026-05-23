@@ -258,8 +258,11 @@
         return String(text || "").replace(/^\d+\.\s*/, "");
     }
 
-    function CompactToolbarText(text, maxLength) {
-        text = StripOrderPrefix(text);
+    function CompactToolbarText(text, maxLength, keepOrderPrefix) {
+        if (!keepOrderPrefix) {
+            text = StripOrderPrefix(text);
+        }
+
         maxLength = maxLength || 28;
 
         if (text.length <= maxLength) {
@@ -267,6 +270,10 @@
         }
 
         return text.substring(0, maxLength - 1) + "...";
+    }
+
+    function GetToolbarDisplayName(text) {
+        return String(text || "").replace(/\s+\([^)]+\)\s*$/, "").trim();
     }
 
     function GetEntityToolbarText(item, toolbar) {
@@ -279,8 +286,7 @@
             return "None";
         }
 
-        var match = String(el.text || "").match(/\(([^)]+)\)$/);
-        return CompactToolbarText(match ? match[1] : el.text, 26);
+        return CompactToolbarText(GetToolbarDisplayName(el.text), 26);
     }
 
     XrmTranslator.ComponentType = {
@@ -1495,7 +1501,7 @@
             '<li><b>Dictionary</b> — Open and manage translation dictionary entries (source &rarr; target term pairs). ' +
             'When <i>Use Dictionary as First Priority</i> is enabled in Auto Translate, dictionary matches are applied before calling the AI provider.</li>' +
             '<li><b>Apply Dictionary</b> — Batch-apply existing dictionary entries to all matching records in the current grid without calling AI. ' +
-            'Supports three modes: <i>All Overwrite</i>, <i>All Missing</i>, <i>All Missing Or Identical</i>.</li>' +
+            'Supports two modes: <i>All Overwrite</i> and <i>All Missing</i>.</li>' +
             '<li><b>Storage:</b> Dictionary data is saved as a web resource (<code>pl_/XrmQuickTranslate/data/TranslationDictionary.xml</code>) ' +
             'inside an unmanaged solution named <b>Xrm Quick Translate Data</b> (unique name: <code>XrmQuickTranslateData</code>). ' +
             'This solution is auto-created on first use.</li>' +
@@ -1614,10 +1620,10 @@
         }
 
         switch(target) {
-            case "aiTranslate:autoTranslate":
+            case "autoTranslate":
                 TranslationHandler.ShowTranslationPrompt();
                 break;
-            case "aiTranslate:aiSettings":
+            case "aiSettings":
                 TranslationHandler.ShowAISettings();
                 break;
         }
@@ -1630,7 +1636,7 @@
                 text: function (item) {
                     var el = this.get('solutionSelect:' + item.selected);
                     if (el) {
-                        return CompactToolbarText(el.text, 24);
+                        return CompactToolbarText(GetToolbarDisplayName(el.text), 24);
                     }
                     return 'Solution';
                 },
@@ -1655,11 +1661,11 @@
                 tooltip: 'Translation type',
                 text: function (item) {
                     var el   = this.get('type:' + item.selected);
-                    return el ? CompactToolbarText(el.text, 18) : 'Type';
+                    return el ? CompactToolbarText(el.text, 18, true) : 'Type';
                 },
                 selected: 'sitemap',
                 items: (XrmTranslator.showAllInOneType ? [
-                    { id: 'allInOne', text: 'All-In-One', icon: 'icon-grid' },
+                    { id: 'allInOne', text: '0. All-In-One', icon: 'icon-grid' },
                     { id: 'entitySeparator', text: '--' }
                 ] : []).concat([
                     { id: 'attributes', text: '1. Attributes', icon: 'icon-attribute' },
@@ -1701,15 +1707,8 @@
             }}
         );
 
-        var aiTranslateMenuItems = [];
-
-        aiTranslateMenuItems.push({ id: 'autoTranslate', text: 'Auto Translate', icon: 'icon-translate' });
-
-        aiTranslateMenuItems.push({ id: 'aiSettings', text: 'AI Settings', icon: 'w2ui-icon-settings' });
-
-        toolbarItems.push({ type: 'menu', id: 'aiTranslate', text: '', tooltip: 'AI translate', icon: 'icon-sparkles',
-            items: aiTranslateMenuItems
-        });
+        toolbarItems.push({ type: 'button', id: 'autoTranslate', text: '', tooltip: 'Auto Translate', icon: 'icon-translate' });
+        toolbarItems.push({ type: 'button', id: 'aiSettings', text: '', tooltip: 'AI Settings', icon: 'w2ui-icon-settings' });
 
         toolbarItems.push({ type: 'break' });
 

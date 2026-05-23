@@ -88,6 +88,70 @@
     pointer-events: none;
 }
 
+#dictionary-main .w2ui-grid-toolbar,
+#dictionary-main .w2ui-grid-toolbar .w2ui-toolbar,
+#dictionary-main .w2ui-grid-toolbar .w2ui-tb-line,
+#dictionary-main .w2ui-grid-toolbar .w2ui-scroll-wrapper {
+    background: #f5f5f5 !important;
+    background-color: #f5f5f5 !important;
+    background-image: none !important;
+}
+
+#dictionary-main .w2ui-grid-toolbar .w2ui-tb-line,
+#dictionary-main .w2ui-grid-toolbar .w2ui-scroll-wrapper.w2ui-eaction {
+    overflow: visible !important;
+}
+
+#dictionary-main .w2ui-grid-toolbar .w2ui-grid-search-input {
+    background: #f1f1f1;
+    border-radius: 4px;
+    box-sizing: border-box;
+    height: 30px;
+    overflow: visible;
+    top: -1px !important;
+    width: 260px !important;
+}
+
+#dictionary-main .w2ui-grid-toolbar .w2ui-grid-search-input::after {
+    border: 1px solid #e1e1e1;
+    border-radius: 4px;
+    box-sizing: border-box;
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 3;
+}
+
+#dictionary-main .w2ui-grid-toolbar .w2ui-grid-search-input:focus-within::after {
+    border-color: #007cff;
+}
+
+#dictionary-main .w2ui-grid-toolbar .w2ui-grid-search-input .w2ui-search-all {
+    background-clip: padding-box !important;
+    background-color: #f1f1f1 !important;
+    border: 0 !important;
+    box-sizing: border-box !important;
+    height: 30px !important;
+    margin-top: 0 !important;
+    max-width: 260px !important;
+    padding: 1px 12px 0 28px !important;
+    width: 260px !important;
+}
+
+#dictionary-main .w2ui-grid-toolbar .w2ui-grid-search-input .w2ui-search-all:focus {
+    background-color: #fff !important;
+    border: 0 !important;
+}
+
+#dictionary-main .w2ui-grid-toolbar .w2ui-grid-search-input .w2ui-search-drop {
+    display: none !important;
+}
+
+#dictionary-main .w2ui-grid-searches {
+    display: none !important;
+}
+
 .xqt-find-replace-popup-form {
     width: 100%;
     height: 100%;
@@ -153,6 +217,52 @@
 
 .xqt-required {
     color: #c00000;
+}
+
+.xqt-dialog-popup .w2ui-popup-body {
+    overflow: hidden !important;
+}
+
+.xqt-dialog-popup .w2ui-popup-buttons {
+    padding: 14px 0 16px !important;
+}
+
+.xqt-dialog-body {
+    align-items: flex-start;
+    box-sizing: border-box;
+    display: flex;
+    gap: 18px;
+    height: 100%;
+    font-size: 16px;
+    line-height: 1.35;
+    overflow: hidden;
+    padding: 22px 32px;
+    width: 100%;
+}
+
+.xqt-dialog-icon {
+    flex: 0 0 auto;
+    font-size: 30px;
+    line-height: 1;
+    margin-top: 2px;
+}
+
+.xqt-dialog-icon-alert {
+    color: #4285f4;
+}
+
+.xqt-dialog-icon-confirm {
+    color: #e6a817;
+}
+
+.xqt-dialog-message {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.xqt-remove-overridden-confirm .xqt-dialog-body {
+    padding: 20px 34px;
 }
 
 .xqt-translation-prompt-popup-form {
@@ -231,6 +341,189 @@
 
 .xqt-translation-prompt-check input[type="checkbox"] {
     margin: 0;
+}
+
+.xqt-apply-dictionary-popup-form {
+    box-sizing: border-box;
+    height: 100%;
+    overflow: hidden;
+    width: 100%;
+}
+
+.xqt-apply-dictionary-form {
+    box-sizing: border-box;
+    max-width: 100%;
+    overflow: hidden !important;
+    padding: 30px 38px 8px;
+    width: 100%;
+}
+
+.xqt-apply-dictionary-description {
+    color: #555;
+    line-height: 1.35;
+    margin: 0 0 18px;
+}
+
+.xqt-apply-dictionary-row {
+    align-items: center;
+    box-sizing: border-box;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 85px minmax(0, 1fr);
+    margin: 0 !important;
+    max-width: 100%;
+    padding: 0 !important;
+    width: 100%;
+}
+
+.xqt-apply-dictionary-label {
+    color: #222;
+    line-height: 32px;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
+    white-space: nowrap;
+    width: auto !important;
+}
+
+.xqt-apply-dictionary-control {
+    box-sizing: border-box;
+    margin: 0 !important;
+    min-width: 0;
+    padding: 0 !important;
+    position: relative;
+    width: 100%;
+}
+
+.xqt-apply-dictionary-control > input,
+.xqt-apply-dictionary-control .w2ui-field-helper {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.xqt-apply-dictionary-control .w2ui-field-helper input {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.xqt-sitemap-selection-popup-form {
+    box-sizing: border-box;
+    height: 100%;
+    overflow: hidden;
+    width: 100%;
+}
+
+.xqt-sitemap-selection-form {
+    box-sizing: border-box;
+    max-width: 100%;
+    overflow: hidden !important;
+    padding: 34px 38px 8px;
+    width: 100%;
+}
+
+.xqt-sitemap-selection-row {
+    align-items: center;
+    box-sizing: border-box;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 90px minmax(0, 1fr);
+    margin: 0 !important;
+    max-width: 100%;
+    padding: 0 !important;
+    width: 100%;
+}
+
+.xqt-sitemap-selection-label {
+    color: #222;
+    line-height: 32px;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
+    white-space: nowrap;
+    width: auto !important;
+}
+
+.xqt-sitemap-selection-control {
+    box-sizing: border-box;
+    margin: 0 !important;
+    min-width: 0;
+    padding: 0 !important;
+    position: relative;
+    width: 100%;
+}
+
+.xqt-sitemap-selection-control > input,
+.xqt-sitemap-selection-control .w2ui-field-helper {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.xqt-sitemap-selection-control .w2ui-field-helper input {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.xqt-form-selection-popup-form {
+    box-sizing: border-box;
+    height: 100%;
+    overflow: hidden;
+    width: 100%;
+}
+
+.xqt-form-selection-form {
+    box-sizing: border-box;
+    max-width: 100%;
+    overflow: hidden !important;
+    padding: 34px 38px 8px;
+    width: 100%;
+}
+
+.xqt-form-selection-row {
+    align-items: center;
+    box-sizing: border-box;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 90px minmax(0, 1fr);
+    margin: 0 !important;
+    max-width: 100%;
+    padding: 0 !important;
+    width: 100%;
+}
+
+.xqt-form-selection-label {
+    color: #222;
+    line-height: 32px;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
+    white-space: nowrap;
+    width: auto !important;
+}
+
+.xqt-form-selection-control {
+    box-sizing: border-box;
+    margin: 0 !important;
+    min-width: 0;
+    padding: 0 !important;
+    position: relative;
+    width: 100%;
+}
+
+.xqt-form-selection-control > input,
+.xqt-form-selection-control .w2ui-field-helper {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.xqt-form-selection-control .w2ui-field-helper input {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: 100% !important;
 }
 
 .w2ui-tb-icon > span[class^="icon-"],

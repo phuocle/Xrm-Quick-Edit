@@ -311,16 +311,66 @@
         });
     }
 
+    function GetCleanText(value) {
+        if (value === null || typeof value === "undefined") {
+            return "";
+        }
+
+        return String(value).trim();
+    }
+
+    function GetNodeDisplayValue(node) {
+        return GetCleanText(node.getAttribute("Title")) ||
+            GetCleanText(node.getAttribute("Id")) ||
+            GetCleanText(node.getAttribute("ResourceId")) ||
+            GetCleanText(node.getAttribute("Entity"));
+    }
+
+    function GetSiteMapLogicalName(sitemap) {
+        if (!sitemap || !sitemap.sitemapxml) {
+            return "";
+        }
+
+        try {
+            var doc = new DOMParser().parseFromString(sitemap.sitemapxml, "application/xml");
+            var areas = doc.getElementsByTagName("Area");
+            var names = [];
+
+            for (var i = 0; i < areas.length && names.length < 3; i++) {
+                var name = GetNodeDisplayValue(areas[i]);
+
+                if (name && names.indexOf(name) === -1) {
+                    names.push(name);
+                }
+            }
+
+            if (names.length > 0) {
+                return names.join(", ");
+            }
+        }
+        catch (e) {
+            return "";
+        }
+
+        return "";
+    }
+
+    function GetSiteMapDisplayName(sitemap) {
+        return GetCleanText(sitemap.sitemapname) ||
+            GetSiteMapLogicalName(sitemap) ||
+            "Unnamed SiteMap";
+    }
+
     function ShowSiteMapSelection(sitemaps) {
         if (!w2ui.siteMapSelectionPrompt) {
             new w2form({
                 name: 'siteMapSelectionPrompt',
                 style: 'border: 0px; background-color: transparent;',
                 formHTML:
-                    '<div class="w2ui-page page-0" style="padding: 20px 25px;">' +
-                    '    <div style="display: flex; align-items: center;">' +
-                    '        <label style="margin-right: 10px; white-space: nowrap;">SiteMap: <span style="color: red;">*</span></label>' +
-                    '        <input name="siteMapSelection" type="list" style="flex: 1; width: 100%;" />' +
+                    '<div class="w2ui-page page-0 xqt-sitemap-selection-form">' +
+                    '    <div class="xqt-sitemap-selection-row">' +
+                    '        <label class="xqt-sitemap-selection-label" for="siteMapSelection">SiteMap: <span class="xqt-required">*</span></label>' +
+                    '        <div class="xqt-sitemap-selection-control"><input name="siteMapSelection" type="list" /></div>' +
                     '    </div>' +
                     '</div>' +
                     '<div class="w2ui-buttons">' +
@@ -328,7 +378,7 @@
                     '    <button class="w2ui-btn" name="ok">Ok</button>' +
                     '</div>',
                 fields: [
-                    { field: 'siteMapSelection', type: 'list', required: true, html: { attr: 'style="width: 100%"' } }
+                    { field: 'siteMapSelection', type: 'list', required: true }
                 ],
                 actions: {
                     "ok": function () {
@@ -351,7 +401,7 @@
         for (var i = 0; i < sitemaps.length; i++) {
             items.push({
                 id: sitemaps[i].sitemapid,
-                text: sitemaps[i].sitemapname || sitemaps[i].sitemapid
+                text: GetSiteMapDisplayName(sitemaps[i])
             });
         }
 
@@ -362,14 +412,15 @@
         w2popup.open({
             title: 'Choose SiteMap',
             name: 'siteMapSelectionPopup',
-            body: '<div id="form" style="width: 100%; height: 100%;"></div>',
-            style: 'padding: 15px 0px 0px 0px',
+            body: '<div id="form" class="xqt-sitemap-selection-popup-form"></div>',
+            style: 'padding: 0px; overflow-x: hidden;',
             width: 650,
-            height: 250,
-            showMax: true,
+            height: 220,
+            showMax: false,
             onOpen: function (event) {
                 event.onComplete = function () {
                     w2ui.siteMapSelectionPrompt.render('#w2ui-popup #form');
+                    w2ui.siteMapSelectionPrompt.resize();
                 };
             },
             onClose: function () {
