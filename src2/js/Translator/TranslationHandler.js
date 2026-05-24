@@ -35,6 +35,19 @@
         modelName: "DeepSeek-V4-Pro",
         customPrompt: ""
     };
+    var AZURE_FOUNDRY_CONFIG_KEY = "XrmQuickTranslate_AzureFoundryConfig";
+    var AZURE_FOUNDRY_DEFAULT_CONFIG = {
+        baseUrl: "",
+        apiKey: "",
+        modelName: "",
+        customPrompt: ""
+    };
+    var AI_PROVIDER_VISIBILITY = {
+        azureFoundry: true,
+        gemini: true,
+        omniRoute: false,
+        openAI: false
+    };
     var TRANSLATION_PROMPT_KEY = "XrmQuickTranslate_TranslationPrompt";
     var translationProviders = [];
 
@@ -119,6 +132,20 @@
         localStorage.setItem(OMNIROUTE_CONFIG_KEY, JSON.stringify(Object.assign({}, OMNIROUTE_DEFAULT_CONFIG, config || {})));
     }
 
+    function GetAzureFoundryConfig() {
+        try {
+            var stored = localStorage.getItem(AZURE_FOUNDRY_CONFIG_KEY);
+            var parsed = stored ? JSON.parse(stored) : {};
+            return Object.assign({}, AZURE_FOUNDRY_DEFAULT_CONFIG, parsed || {});
+        } catch(e) {
+            return Object.assign({}, AZURE_FOUNDRY_DEFAULT_CONFIG);
+        }
+    }
+
+    function SaveAzureFoundryConfig(config) {
+        localStorage.setItem(AZURE_FOUNDRY_CONFIG_KEY, JSON.stringify(Object.assign({}, AZURE_FOUNDRY_DEFAULT_CONFIG, config || {})));
+    }
+
     function normalizeBoolean(value, defaultValue) {
         if (value === undefined || value === null || value === "") {
             return defaultValue;
@@ -140,8 +167,20 @@
         return defaultValue;
     }
 
+    function IsConfiguredProviderEnabled(providerKey) {
+        return AI_PROVIDER_VISIBILITY[providerKey] === true;
+    }
+
     function IsOpenAIEnabled() {
-        return false;
+        return IsConfiguredProviderEnabled("openAI");
+    }
+
+    function IsOmniRouteEnabled() {
+        return IsConfiguredProviderEnabled("omniRoute");
+    }
+
+    function IsAzureFoundryEnabled() {
+        return IsConfiguredProviderEnabled("azureFoundry");
     }
 
     function IsProviderEnabled(provider) {
@@ -347,7 +386,17 @@
         return normalizedBaseUrl + "/chat/completions";
     }
 
-    const openAICompatibleTranslator = function (providerName, baseUrl, apiKey, modelName, customPrompt) {
+    function BuildOpenAICompatibleHeaders(apiKey, authHeaderName) {
+        var normalizedAuthHeaderName = String(authHeaderName || "").trim().toLowerCase();
+
+        if (normalizedAuthHeaderName === "api-key") {
+            return { "api-key": apiKey };
+        }
+
+        return { "Authorization": "Bearer " + apiKey };
+    }
+
+    const openAICompatibleTranslator = function (providerName, baseUrl, apiKey, modelName, customPrompt, authHeaderName) {
         var apiUrl = BuildOpenAICompatibleChatUrl(baseUrl);
 
         this.GetBatchTranslations = function(fromLanguage, destLanguage, phrases) {
@@ -370,9 +419,7 @@
                 ]
             };
 
-            return PostJson(apiUrl, {
-                "Authorization": "Bearer " + apiKey
-            }, requestBody)
+            return PostJson(apiUrl, BuildOpenAICompatibleHeaders(apiKey, authHeaderName), requestBody)
             .then(function(response) {
                 if (!response || !response.choices || !response.choices[0] ||
                     !response.choices[0].message || !response.choices[0].message.content) {
@@ -437,9 +484,14 @@
         return new openAICompatibleTranslator("OmniRoute", baseUrl, apiKey, modelName, customPrompt);
     };
 
+    const azureFoundryTranslator = function (baseUrl, apiKey, modelName, customPrompt) {
+        return new openAICompatibleTranslator("Azure Foundry", baseUrl, apiKey, modelName, customPrompt, "api-key");
+    };
+
     RegisterTranslationProvider({
         id: "omniroute",
         text: "OmniRoute",
+        enabled: IsOmniRouteEnabled,
         validate: function() {
             var omniRouteConfig = GetOmniRouteConfig();
 
@@ -468,6 +520,38 @@
                 omniRouteConfig.apiKey,
                 omniRouteConfig.modelName,
                 omniRouteConfig.customPrompt
+            );
+        }
+    });
+
+    RegisterTranslationProvider({
+        id: "azure-foundry",
+        text: "Azure Foundry",
+        enabled: IsAzureFoundryEnabled,
+        validate: function() {
+            var azureFoundryConfig = GetAzureFoundryConfig();
+
+            if (!azureFoundryConfig || !azureFoundryConfig.baseUrl) {
+                return "Azure Foundry: Base URL is missing. Please configure it via AI Settings.";
+            }
+
+            if (!azureFoundryConfig.apiKey) {
+                return "Azure Foundry: API Key is missing. Please configure it via AI Settings.";
+            }
+
+            if (!azureFoundryConfig.modelName) {
+                return "Azure Foundry: Model Name is missing. Please configure it via AI Settings.";
+            }
+
+            return null;
+        },
+        create: function() {
+            var azureFoundryConfig = GetAzureFoundryConfig();
+            return new azureFoundryTranslator(
+                azureFoundryConfig.baseUrl,
+                azureFoundryConfig.apiKey,
+                azureFoundryConfig.modelName,
+                azureFoundryConfig.customPrompt
             );
         }
     });
@@ -1109,9 +1193,11 @@
     function InitializeAISettingsForm() {
         var geminiConfig = GetGeminiConfig();
         var omniRouteConfig = GetOmniRouteConfig();
+        var azureFoundryConfig = GetAzureFoundryConfig();
         var openaiConfig = GetOpenAIConfig();
         var maskedGeminiKey = MaskApiKey(geminiConfig.apiKey);
         var maskedOmniRouteKey = MaskApiKey(omniRouteConfig.apiKey);
+        var maskedAzureFoundryKey = MaskApiKey(azureFoundryConfig.apiKey);
         var maskedOpenaiKey = MaskApiKey(openaiConfig.apiKey);
         var nextPageIndex = 1;
         var aiSettingsTabs = [
@@ -1143,37 +1229,73 @@
             geminiCustomPrompt: geminiConfig.customPrompt || ""
         };
 
-        var omniRoutePageIndex = nextPageIndex++;
-        aiSettingsTabs.push({ id: 'tab-omniroute', text: 'OmniRoute' });
-        aiSettingsFormHTML +=
-            '<div class="w2ui-page page-' + omniRoutePageIndex + '" style="padding: 15px 25px;">'+
-            '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-            '        <label style="min-width: 120px; white-space: nowrap;">Base URL: <span style="color: red;">*</span></label>'+
-            '        <input name="omniRouteBaseUrl" type="text" style="flex: 1; width: 100%;"/>'+
-            '    </div>'+
-            '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-            '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
-            '        <input name="omniRouteApiKey" type="password" style="flex: 1; width: 100%;"/>'+
-            '    </div>'+
-            '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
-            '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
-            '        <input name="omniRouteModelName" type="text" style="flex: 1; width: 100%;"/>'+
-            '    </div>'+
-            '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
-            '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
-            '        <textarea name="omniRouteCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
-            '    </div>'+
-            '</div>';
-        aiSettingsFields.push(
-            { field: 'omniRouteBaseUrl', type: 'text', html: { page: omniRoutePageIndex } },
-            { field: 'omniRouteApiKey', type: 'text', html: { page: omniRoutePageIndex } },
-            { field: 'omniRouteModelName', type: 'text', html: { page: omniRoutePageIndex } },
-            { field: 'omniRouteCustomPrompt', type: 'text', html: { page: omniRoutePageIndex } }
-        );
-        aiSettingsRecord.omniRouteBaseUrl = omniRouteConfig.baseUrl || OMNIROUTE_DEFAULT_CONFIG.baseUrl;
-        aiSettingsRecord.omniRouteApiKey = maskedOmniRouteKey;
-        aiSettingsRecord.omniRouteModelName = omniRouteConfig.modelName || OMNIROUTE_DEFAULT_CONFIG.modelName;
-        aiSettingsRecord.omniRouteCustomPrompt = omniRouteConfig.customPrompt || "";
+        if (IsOmniRouteEnabled()) {
+            var omniRoutePageIndex = nextPageIndex++;
+            aiSettingsTabs.push({ id: 'tab-omniroute', text: 'OmniRoute' });
+            aiSettingsFormHTML +=
+                '<div class="w2ui-page page-' + omniRoutePageIndex + '" style="padding: 15px 25px;">'+
+                '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap;">Base URL: <span style="color: red;">*</span></label>'+
+                '        <input name="omniRouteBaseUrl" type="text" style="flex: 1; width: 100%;"/>'+
+                '    </div>'+
+                '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
+                '        <input name="omniRouteApiKey" type="password" style="flex: 1; width: 100%;"/>'+
+                '    </div>'+
+                '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
+                '        <input name="omniRouteModelName" type="text" style="flex: 1; width: 100%;"/>'+
+                '    </div>'+
+                '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
+                '        <textarea name="omniRouteCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
+                '    </div>'+
+                '</div>';
+            aiSettingsFields.push(
+                { field: 'omniRouteBaseUrl', type: 'text', html: { page: omniRoutePageIndex } },
+                { field: 'omniRouteApiKey', type: 'text', html: { page: omniRoutePageIndex } },
+                { field: 'omniRouteModelName', type: 'text', html: { page: omniRoutePageIndex } },
+                { field: 'omniRouteCustomPrompt', type: 'text', html: { page: omniRoutePageIndex } }
+            );
+            aiSettingsRecord.omniRouteBaseUrl = omniRouteConfig.baseUrl || OMNIROUTE_DEFAULT_CONFIG.baseUrl;
+            aiSettingsRecord.omniRouteApiKey = maskedOmniRouteKey;
+            aiSettingsRecord.omniRouteModelName = omniRouteConfig.modelName || OMNIROUTE_DEFAULT_CONFIG.modelName;
+            aiSettingsRecord.omniRouteCustomPrompt = omniRouteConfig.customPrompt || "";
+        }
+
+        if (IsAzureFoundryEnabled()) {
+            var azureFoundryPageIndex = nextPageIndex++;
+            aiSettingsTabs.push({ id: 'tab-azure-foundry', text: 'Azure Foundry' });
+            aiSettingsFormHTML +=
+                '<div class="w2ui-page page-' + azureFoundryPageIndex + '" style="padding: 15px 25px;">'+
+                '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap;">Base URL: <span style="color: red;">*</span></label>'+
+                '        <input name="azureFoundryBaseUrl" type="text" style="flex: 1; width: 100%;"/>'+
+                '    </div>'+
+                '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
+                '        <input name="azureFoundryApiKey" type="password" style="flex: 1; width: 100%;"/>'+
+                '    </div>'+
+                '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
+                '        <input name="azureFoundryModelName" type="text" style="flex: 1; width: 100%;"/>'+
+                '    </div>'+
+                '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
+                '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
+                '        <textarea name="azureFoundryCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
+                '    </div>'+
+                '</div>';
+            aiSettingsFields.push(
+                { field: 'azureFoundryBaseUrl', type: 'text', html: { page: azureFoundryPageIndex } },
+                { field: 'azureFoundryApiKey', type: 'text', html: { page: azureFoundryPageIndex } },
+                { field: 'azureFoundryModelName', type: 'text', html: { page: azureFoundryPageIndex } },
+                { field: 'azureFoundryCustomPrompt', type: 'text', html: { page: azureFoundryPageIndex } }
+            );
+            aiSettingsRecord.azureFoundryBaseUrl = azureFoundryConfig.baseUrl || AZURE_FOUNDRY_DEFAULT_CONFIG.baseUrl;
+            aiSettingsRecord.azureFoundryApiKey = maskedAzureFoundryKey;
+            aiSettingsRecord.azureFoundryModelName = azureFoundryConfig.modelName || AZURE_FOUNDRY_DEFAULT_CONFIG.modelName;
+            aiSettingsRecord.azureFoundryCustomPrompt = azureFoundryConfig.customPrompt || "";
+        }
 
         if (IsOpenAIEnabled()) {
             var openaiPageIndex = nextPageIndex++;
@@ -1234,17 +1356,33 @@
                             customPrompt: this.record.geminiCustomPrompt || ""
                         });
 
-                        var currentOmniRoute = GetOmniRouteConfig();
-                        var omniRouteKeyToSave = this.record.omniRouteApiKey;
-                        if (omniRouteKeyToSave && omniRouteKeyToSave.indexOf("*") !== -1 && currentOmniRoute && currentOmniRoute.apiKey) {
-                            omniRouteKeyToSave = currentOmniRoute.apiKey;
+                        if (IsOmniRouteEnabled()) {
+                            var currentOmniRoute = GetOmniRouteConfig();
+                            var omniRouteKeyToSave = this.record.omniRouteApiKey;
+                            if (omniRouteKeyToSave && omniRouteKeyToSave.indexOf("*") !== -1 && currentOmniRoute && currentOmniRoute.apiKey) {
+                                omniRouteKeyToSave = currentOmniRoute.apiKey;
+                            }
+                            SaveOmniRouteConfig({
+                                baseUrl: this.record.omniRouteBaseUrl || OMNIROUTE_DEFAULT_CONFIG.baseUrl,
+                                apiKey: omniRouteKeyToSave || "",
+                                modelName: this.record.omniRouteModelName || OMNIROUTE_DEFAULT_CONFIG.modelName,
+                                customPrompt: this.record.omniRouteCustomPrompt || ""
+                            });
                         }
-                        SaveOmniRouteConfig({
-                            baseUrl: this.record.omniRouteBaseUrl || OMNIROUTE_DEFAULT_CONFIG.baseUrl,
-                            apiKey: omniRouteKeyToSave || "",
-                            modelName: this.record.omniRouteModelName || OMNIROUTE_DEFAULT_CONFIG.modelName,
-                            customPrompt: this.record.omniRouteCustomPrompt || ""
-                        });
+
+                        if (IsAzureFoundryEnabled()) {
+                            var currentAzureFoundry = GetAzureFoundryConfig();
+                            var azureFoundryKeyToSave = this.record.azureFoundryApiKey;
+                            if (azureFoundryKeyToSave && azureFoundryKeyToSave.indexOf("*") !== -1 && currentAzureFoundry && currentAzureFoundry.apiKey) {
+                                azureFoundryKeyToSave = currentAzureFoundry.apiKey;
+                            }
+                            SaveAzureFoundryConfig({
+                                baseUrl: this.record.azureFoundryBaseUrl || AZURE_FOUNDRY_DEFAULT_CONFIG.baseUrl,
+                                apiKey: azureFoundryKeyToSave || "",
+                                modelName: this.record.azureFoundryModelName || AZURE_FOUNDRY_DEFAULT_CONFIG.modelName,
+                                customPrompt: this.record.azureFoundryCustomPrompt || ""
+                            });
+                        }
 
                         if (IsOpenAIEnabled()) {
                             var currentOpenai = GetOpenAIConfig();
