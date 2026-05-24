@@ -28,6 +28,13 @@
     var locales = null;
     var GEMINI_CONFIG_KEY = "XrmQuickTranslate_GeminiConfig";
     var OPENAI_CONFIG_KEY = "XrmQuickTranslate_OpenAIConfig";
+    var OMNIROUTE_CONFIG_KEY = "XrmQuickTranslate_OmniRouteConfig";
+    var OMNIROUTE_DEFAULT_CONFIG = {
+        baseUrl: "http://omniroute.eastus2.azurecontainer.io:20128/v1",
+        apiKey: "",
+        modelName: "DeepSeek-V4-Pro",
+        customPrompt: ""
+    };
     var TRANSLATION_PROMPT_KEY = "XrmQuickTranslate_TranslationPrompt";
     var translationProviders = [];
 
@@ -98,6 +105,20 @@
         localStorage.setItem(OPENAI_CONFIG_KEY, JSON.stringify(config));
     }
 
+    function GetOmniRouteConfig() {
+        try {
+            var stored = localStorage.getItem(OMNIROUTE_CONFIG_KEY);
+            var parsed = stored ? JSON.parse(stored) : {};
+            return Object.assign({}, OMNIROUTE_DEFAULT_CONFIG, parsed || {});
+        } catch(e) {
+            return Object.assign({}, OMNIROUTE_DEFAULT_CONFIG);
+        }
+    }
+
+    function SaveOmniRouteConfig(config) {
+        localStorage.setItem(OMNIROUTE_CONFIG_KEY, JSON.stringify(Object.assign({}, OMNIROUTE_DEFAULT_CONFIG, config || {})));
+    }
+
     function normalizeBoolean(value, defaultValue) {
         if (value === undefined || value === null || value === "") {
             return defaultValue;
@@ -145,6 +166,13 @@
 
                 return data;
             });
+        })
+        .catch(function(error) {
+            if (error instanceof TypeError) {
+                throw new Error("Network request failed. Check that the AI endpoint is reachable from this browser, uses HTTPS when the app is loaded over HTTPS, and allows CORS for this Dynamics origin.");
+            }
+
+            throw error;
         });
     }
 
@@ -309,8 +337,18 @@
         }
     });
 
-    const openAITranslator = function (apiKey, modelName, customPrompt) {
-        var apiUrl = "https://api.openai.com/v1/chat/completions";
+    function BuildOpenAICompatibleChatUrl(baseUrl) {
+        var normalizedBaseUrl = String(baseUrl || "").trim().replace(/\/+$/, "");
+
+        if (/\/chat\/completions$/i.test(normalizedBaseUrl)) {
+            return normalizedBaseUrl;
+        }
+
+        return normalizedBaseUrl + "/chat/completions";
+    }
+
+    const openAICompatibleTranslator = function (providerName, baseUrl, apiKey, modelName, customPrompt) {
+        var apiUrl = BuildOpenAICompatibleChatUrl(baseUrl);
 
         this.GetBatchTranslations = function(fromLanguage, destLanguage, phrases) {
             var systemPrompt = "You are a professional translator for a Microsoft Dynamics CRM / Dataverse system. " +
@@ -324,6 +362,8 @@
 
             var requestBody = {
                 model: modelName,
+                stream: false,
+                temperature: 0,
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: "Labels to translate:\n" + userMessage }
@@ -337,7 +377,7 @@
                 if (!response || !response.choices || !response.choices[0] ||
                     !response.choices[0].message || !response.choices[0].message.content) {
                     var errorMsg = (response && response.error && response.error.message) || "No translation returned";
-                    throw new Error("OpenAI API error: " + errorMsg);
+                    throw new Error(providerName + " API error: " + errorMsg);
                 }
                 var text = response.choices[0].message.content;
                 text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
@@ -345,7 +385,7 @@
                 var translations = JSON.parse(text);
 
                 if (!Array.isArray(translations) || translations.length !== phrases.length) {
-                    throw new Error("OpenAI returned " + (translations ? translations.length : 0) +
+                    throw new Error(providerName + " returned " + (translations ? translations.length : 0) +
                         " translations but " + phrases.length + " were expected.");
                 }
 
@@ -388,6 +428,49 @@
             });
         };
     };
+
+    const openAITranslator = function (apiKey, modelName, customPrompt) {
+        return new openAICompatibleTranslator("OpenAI", "https://api.openai.com/v1", apiKey, modelName, customPrompt);
+    };
+
+    const omniRouteTranslator = function (baseUrl, apiKey, modelName, customPrompt) {
+        return new openAICompatibleTranslator("OmniRoute", baseUrl, apiKey, modelName, customPrompt);
+    };
+
+    RegisterTranslationProvider({
+        id: "omniroute",
+        text: "OmniRoute",
+        validate: function() {
+            var omniRouteConfig = GetOmniRouteConfig();
+
+            if (!omniRouteConfig || !omniRouteConfig.baseUrl) {
+                return "OmniRoute: Base URL is missing. Please configure it via AI Settings.";
+            }
+
+            if (typeof window !== "undefined" && window.location && window.location.protocol === "https:" && /^http:\/\//i.test(omniRouteConfig.baseUrl)) {
+                return "OmniRoute: Base URL uses HTTP, but Dynamics is loaded over HTTPS. Browser blocks this mixed-content request. Please expose OmniRoute over HTTPS and update Base URL.";
+            }
+
+            if (!omniRouteConfig.apiKey) {
+                return "OmniRoute: API Key is missing. Please configure it via AI Settings.";
+            }
+
+            if (!omniRouteConfig.modelName) {
+                return "OmniRoute: Model Name is missing. Please configure it via AI Settings.";
+            }
+
+            return null;
+        },
+        create: function() {
+            var omniRouteConfig = GetOmniRouteConfig();
+            return new omniRouteTranslator(
+                omniRouteConfig.baseUrl,
+                omniRouteConfig.apiKey,
+                omniRouteConfig.modelName,
+                omniRouteConfig.customPrompt
+            );
+        }
+    });
 
     RegisterTranslationProvider({
         id: "openai",
@@ -1025,9 +1108,12 @@
 
     function InitializeAISettingsForm() {
         var geminiConfig = GetGeminiConfig();
+        var omniRouteConfig = GetOmniRouteConfig();
         var openaiConfig = GetOpenAIConfig();
         var maskedGeminiKey = MaskApiKey(geminiConfig.apiKey);
+        var maskedOmniRouteKey = MaskApiKey(omniRouteConfig.apiKey);
         var maskedOpenaiKey = MaskApiKey(openaiConfig.apiKey);
+        var nextPageIndex = 1;
         var aiSettingsTabs = [
             { id: 'tab-google', text: 'Google' }
         ];
@@ -1057,10 +1143,43 @@
             geminiCustomPrompt: geminiConfig.customPrompt || ""
         };
 
+        var omniRoutePageIndex = nextPageIndex++;
+        aiSettingsTabs.push({ id: 'tab-omniroute', text: 'OmniRoute' });
+        aiSettingsFormHTML +=
+            '<div class="w2ui-page page-' + omniRoutePageIndex + '" style="padding: 15px 25px;">'+
+            '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+            '        <label style="min-width: 120px; white-space: nowrap;">Base URL: <span style="color: red;">*</span></label>'+
+            '        <input name="omniRouteBaseUrl" type="text" style="flex: 1; width: 100%;"/>'+
+            '    </div>'+
+            '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+            '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
+            '        <input name="omniRouteApiKey" type="password" style="flex: 1; width: 100%;"/>'+
+            '    </div>'+
+            '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
+            '        <label style="min-width: 120px; white-space: nowrap;">Model Name: <span style="color: red;">*</span></label>'+
+            '        <input name="omniRouteModelName" type="text" style="flex: 1; width: 100%;"/>'+
+            '    </div>'+
+            '    <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">'+
+            '        <label style="min-width: 120px; white-space: nowrap; padding-top: 5px;">Custom Prompt:</label>'+
+            '        <textarea name="omniRouteCustomPrompt" style="flex: 1; width: 100%; height: 80px;"></textarea>'+
+            '    </div>'+
+            '</div>';
+        aiSettingsFields.push(
+            { field: 'omniRouteBaseUrl', type: 'text', html: { page: omniRoutePageIndex } },
+            { field: 'omniRouteApiKey', type: 'text', html: { page: omniRoutePageIndex } },
+            { field: 'omniRouteModelName', type: 'text', html: { page: omniRoutePageIndex } },
+            { field: 'omniRouteCustomPrompt', type: 'text', html: { page: omniRoutePageIndex } }
+        );
+        aiSettingsRecord.omniRouteBaseUrl = omniRouteConfig.baseUrl || OMNIROUTE_DEFAULT_CONFIG.baseUrl;
+        aiSettingsRecord.omniRouteApiKey = maskedOmniRouteKey;
+        aiSettingsRecord.omniRouteModelName = omniRouteConfig.modelName || OMNIROUTE_DEFAULT_CONFIG.modelName;
+        aiSettingsRecord.omniRouteCustomPrompt = omniRouteConfig.customPrompt || "";
+
         if (IsOpenAIEnabled()) {
+            var openaiPageIndex = nextPageIndex++;
             aiSettingsTabs.push({ id: 'tab-openai', text: 'OpenAI' });
             aiSettingsFormHTML +=
-                '<div class="w2ui-page page-1" style="padding: 15px 25px;">'+
+                '<div class="w2ui-page page-' + openaiPageIndex + '" style="padding: 15px 25px;">'+
                 '    <div style="display: flex; align-items: center; margin-bottom: 10px;">'+
                 '        <label style="min-width: 120px; white-space: nowrap;">API Key: <span style="color: red;">*</span></label>'+
                 '        <input name="openaiApiKey" type="password" style="flex: 1; width: 100%;"/>'+
@@ -1075,9 +1194,9 @@
                 '    </div>'+
                 '</div>';
             aiSettingsFields.push(
-                { field: 'openaiApiKey', type: 'text', html: { page: 1 } },
-                { field: 'openaiModelName', type: 'text', html: { page: 1 } },
-                { field: 'openaiCustomPrompt', type: 'text', html: { page: 1 } }
+                { field: 'openaiApiKey', type: 'text', html: { page: openaiPageIndex } },
+                { field: 'openaiModelName', type: 'text', html: { page: openaiPageIndex } },
+                { field: 'openaiCustomPrompt', type: 'text', html: { page: openaiPageIndex } }
             );
             aiSettingsRecord.openaiApiKey = maskedOpenaiKey;
             aiSettingsRecord.openaiModelName = openaiConfig.modelName || "gpt-4o-mini";
@@ -1089,6 +1208,10 @@
             '    <button class="w2ui-btn" name="cancel">Cancel</button>'+
             '    <button class="w2ui-btn" name="save">Save</button>'+
             '</div>';
+
+        if (w2ui.aiSettings) {
+            w2ui.aiSettings.destroy();
+        }
 
         if (!w2ui.aiSettings) {
             new w2form({
@@ -1109,6 +1232,18 @@
                             apiKey: geminiKeyToSave || "",
                             modelName: this.record.geminiModelName || "gemini-3.1-flash-lite",
                             customPrompt: this.record.geminiCustomPrompt || ""
+                        });
+
+                        var currentOmniRoute = GetOmniRouteConfig();
+                        var omniRouteKeyToSave = this.record.omniRouteApiKey;
+                        if (omniRouteKeyToSave && omniRouteKeyToSave.indexOf("*") !== -1 && currentOmniRoute && currentOmniRoute.apiKey) {
+                            omniRouteKeyToSave = currentOmniRoute.apiKey;
+                        }
+                        SaveOmniRouteConfig({
+                            baseUrl: this.record.omniRouteBaseUrl || OMNIROUTE_DEFAULT_CONFIG.baseUrl,
+                            apiKey: omniRouteKeyToSave || "",
+                            modelName: this.record.omniRouteModelName || OMNIROUTE_DEFAULT_CONFIG.modelName,
+                            customPrompt: this.record.omniRouteCustomPrompt || ""
                         });
 
                         if (IsOpenAIEnabled()) {

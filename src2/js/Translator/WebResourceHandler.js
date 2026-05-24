@@ -136,6 +136,10 @@
         return index !== -1 ? displayName.substr(0, index) : name || displayName;
     }
 
+    function GetResourceDisplayName(resource, fallback) {
+        return resource.name || resource.displayname || fallback;
+    }
+
     function ReplaceResourceLcid(value, currentLcid, nextLcid) {
         return value ? value.replace(currentLcid, nextLcid) : value;
     }
@@ -368,7 +372,7 @@
 
             var record = {
                 recid: key,
-                schemaName: key,
+                schemaName: group.__displayName || key,
                 w2ui: {
                     editable: false,
                     children: []
@@ -427,6 +431,7 @@
                 .then(function (g) {
                     return { 
                         key: groupingKey,
+                        displayName: GetResourceDisplayName(rec, groupingKey),
                         value: g.value.filter(function(w) {
                             return MatchLocalizedResource(w);
                         }).map(function(w) {
@@ -447,6 +452,7 @@
                 var resources = cur.value.filter(function(g) { return g.content && typeof(g.content) === "object" });
                 
                 if (resources.length > 0) {
+                    resources.__displayName = cur.displayName;
                     all[cur.key] = resources;
                 }
 
