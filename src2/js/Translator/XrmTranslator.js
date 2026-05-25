@@ -1780,6 +1780,211 @@
         TriggerLoading(entity);
     }
 
+    function GetColumnDisplayName(field) {
+        var columns = XrmTranslator.GetGrid().columns || [];
+        var fieldText = String(field);
+
+        for (var i = 0; i < columns.length; i++) {
+            if (String(columns[i].field) === fieldText) {
+                return columns[i].text || columns[i].caption || columns[i].label || fieldText;
+            }
+        }
+
+        return fieldText;
+    }
+
+    function DecodeDictionaryText(value) {
+        if (value === null || typeof value === "undefined") {
+            return "";
+        }
+
+        var text = String(value);
+        return (typeof w2utils !== "undefined" && w2utils.decodeTags) ? w2utils.decodeTags(text) : text;
+    }
+
+    function HasDictionaryText(value) {
+        return DecodeDictionaryText(value)
+            .replace(/&nbsp;/gi, " ")
+            .replace(/\u00a0/g, " ")
+            .replace(/<[^>]*>/g, "")
+            .trim()
+            .length > 0;
+    }
+
+    function GetDictionaryGridValue(record, field) {
+        if (!record) {
+            return "";
+        }
+
+        if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, field)) {
+            return record.w2ui.changes[field];
+        }
+
+        if (Object.prototype.hasOwnProperty.call(record, field)) {
+            return record[field];
+        }
+
+        var stringField = String(field);
+        if (record.w2ui && record.w2ui.changes && Object.prototype.hasOwnProperty.call(record.w2ui.changes, stringField)) {
+            return record.w2ui.changes[stringField];
+        }
+
+        if (Object.prototype.hasOwnProperty.call(record, stringField)) {
+            return record[stringField];
+        }
+
+        return "";
+    }
+
+    function EscapeHtml(text) {
+        return String(text || "").replace(/[&<>"]/g, function (m) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[m];
+        });
+    }
+
+    function BuildDictionaryValueBox(label, value) {
+        return '<div style="margin: 0 0 14px 0;">' +
+            '<div style="font-weight: 600; color: #444; margin-bottom: 5px;">' + EscapeHtml(label) + '</div>' +
+            '<div style="border: 1px solid #d0d7de; background: #f8f9fb; border-radius: 4px; padding: 9px 11px; font-weight: 600; color: #111; white-space: pre-wrap;">' + EscapeHtml(value) + '</div>' +
+            '</div>';
+    }
+
+    function ConfirmAddSelectedTranslationToDictionary(sourceLabel, sourceText, targetItems) {
+        var body = '<div style="padding: 22px 28px 18px 28px; font-size: 15px; line-height: 1.45;">' +
+            '<div style="font-size: 18px; font-weight: 600; margin-bottom: 18px;">Add this translation to dictionary?</div>' +
+            BuildDictionaryValueBox("Source (" + sourceLabel + ")", sourceText);
+
+        for (var i = 0; i < targetItems.length; i++) {
+            body += BuildDictionaryValueBox(targetItems[i].label, targetItems[i].value);
+        }
+
+        body += '</div>';
+
+        return new Promise(function (resolve) {
+            var result = false;
+
+            w2popup.open({
+                title: "Add to Dictionary",
+                body: body,
+                buttons: '<button class="w2ui-btn" onclick="w2popup._xqtAddDictionaryResult=false; w2popup.close();">No</button> ' +
+                         '<button class="w2ui-btn" onclick="w2popup._xqtAddDictionaryResult=true; w2popup.close();">Add</button>',
+                width: 720,
+                height: 560,
+                modal: true,
+                showClose: true,
+                showMax: false,
+                onOpen: function () {
+                    w2popup._xqtAddDictionaryResult = false;
+                },
+                onClose: function () {
+                    result = !!w2popup._xqtAddDictionaryResult;
+                    w2popup._xqtAddDictionaryResult = null;
+                    resolve(result);
+                }
+            });
+        });
+    }
+
+    function ShowAddSelectedTranslationToDictionary() {
+        if (!window.TranslationDictionaryService || !TranslationDictionaryService.UpsertEntries) {
+            return DialogHelper.alert("Dictionary service is not available.", { title: "Dictionary" });
+        }
+
+        var grid = XrmTranslator.GetGrid();
+        var selected = grid.getSelection ? (grid.getSelection() || []) : [];
+
+        if (selected.length !== 1) {
+            return DialogHelper.alert("Please select exactly one translatable row.", { title: "Dictionary" });
+        }
+
+        var selectedId = selected[0] && selected[0].recid ? selected[0].recid : selected[0];
+        var record = XrmTranslator.GetByRecId(XrmTranslator.GetAllRecords(), selectedId);
+
+        if (!record) {
+            return DialogHelper.alert("Selected row was not found.", { title: "Dictionary" });
+        }
+
+        if ((record.w2ui && record.w2ui.summary) || record._isGroupNode || (record.w2ui && record.w2ui.editable === false)) {
+            return DialogHelper.alert("Selected row is a group row and cannot be added to dictionary. Please select a translatable label row.", { title: "Dictionary" });
+        }
+
+        return XrmTranslator.GetBaseLanguage()
+        .then(function (baseLanguage) {
+            var baseLcid = String(baseLanguage);
+            var sourceText = DecodeDictionaryText(GetDictionaryGridValue(record, baseLcid)).trim();
+
+            if (!HasDictionaryText(sourceText)) {
+                return DialogHelper.alert("Selected row does not have source text in " + GetColumnDisplayName(baseLcid) + ".", { title: "Dictionary" });
+            }
+
+            var targetColumns = XrmTranslator.GetColumns(false)
+                .map(function (field) { return String(field); })
+                .filter(function (field) {
+                    return field !== baseLcid && /^\d+$/.test(field);
+                });
+
+            if (!targetColumns.length) {
+                return DialogHelper.alert("No target language columns found.", { title: "Dictionary" });
+            }
+
+            var targets = {};
+            var targetItems = [];
+            var targetNames = [];
+
+            for (var i = 0; i < targetColumns.length; i++) {
+                var targetLcid = targetColumns[i];
+                var targetName = GetColumnDisplayName(targetLcid);
+                var targetText = DecodeDictionaryText(GetDictionaryGridValue(record, targetLcid)).trim();
+
+                targetNames.push(targetName);
+
+                if (!HasDictionaryText(targetText)) {
+                    continue;
+                }
+
+                targets[targetLcid] = targetText;
+                targetItems.push({
+                    label: targetName,
+                    value: targetText
+                });
+            }
+
+            if (!targetItems.length) {
+                return DialogHelper.alert("No translated value found for target languages: " + targetNames.join(", ") + ".", { title: "Dictionary" });
+            }
+
+            return ConfirmAddSelectedTranslationToDictionary(GetColumnDisplayName(baseLcid), sourceText, targetItems)
+            .then(function (confirmed) {
+                if (!confirmed) {
+                    return null;
+                }
+
+                XrmTranslator.LockGrid("Updating dictionary...");
+
+                return TranslationDictionaryService.UpsertEntries([{
+                    sourceText: sourceText,
+                    targets: targets
+                }])
+                .then(function (result) {
+                    XrmTranslator.UnlockGrid();
+                    return DialogHelper.alert(
+                        "Dictionary updated.\n\nSource: " + sourceText + "\nTargets saved: " + result.targetCount,
+                        { title: "Dictionary" }
+                    );
+                })
+                .catch(function (error) {
+                    XrmTranslator.UnlockGrid();
+                    var message = error && error.message ? error.message : String(error);
+                    return DialogHelper.alert(message, { title: "Dictionary" });
+                });
+            });
+        })
+        .catch(function (error) {
+            var message = error && error.message ? error.message : String(error);
+            return DialogHelper.alert(message, { title: "Dictionary" });
+        });
+    }
+
     function ShowAbout () {
         var html = '<div style="padding: 25px 30px; font-size: 15px; line-height: 1.6; text-align: center;">' +
             '<h2 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Xrm Quick Translate</h2>' +
@@ -2040,6 +2245,10 @@
 
         toolbarItems.push({ type: 'button', id: 'applyDictionary', text: '', tooltip: 'Apply dictionary', icon: 'icon-book-check', onClick: function () {
             TranslationHandler.ShowApplyDictionaryPrompt();
+        } });
+
+        toolbarItems.push({ type: 'button', id: 'addSelectedDictionary', text: '', tooltip: 'Add selected translation to dictionary', icon: 'icon-book-plus', onClick: function () {
+            ShowAddSelectedTranslationToDictionary();
         } });
 
         toolbarItems.push({ type: 'button', id: 'dictionary', text: '', tooltip: 'Manage dictionary', icon: 'icon-book', onClick: function () {

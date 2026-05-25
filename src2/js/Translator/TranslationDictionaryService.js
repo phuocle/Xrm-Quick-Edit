@@ -753,6 +753,16 @@
         return xml.join("\n");
     }
 
+    function sortDictionaryEntries(entries) {
+        return (entries || []).sort(function (left, right) {
+            return normalizeLookupText(left && left.sourceText).localeCompare(
+                normalizeLookupText(right && right.sourceText),
+                undefined,
+                { sensitivity: "base" }
+            );
+        });
+    }
+
     function sanitizeDictionaryModel(records, context) {
         var entries = [];
         var targets = (context && context.targetLanguages) || [];
@@ -790,7 +800,7 @@
 
         return {
             sourceLcid: String((context && context.baseLcid) || ""),
-            entries: entries
+            entries: sortDictionaryEntries(entries)
         };
     }
 
@@ -1377,7 +1387,7 @@
     function toGridRecords(model, context) {
         var entries = (model && model.entries) || [];
 
-        return entries.map(function (entry, index) {
+        return sortDictionaryEntries(entries).map(function (entry, index) {
             var record = {
                 recid: index + 1,
                 sourceText: entry.sourceText,
@@ -1426,6 +1436,112 @@
 
     TranslationDictionaryService.GetStorageInfo = function () {
         return storageInfo;
+    };
+
+    TranslationDictionaryService.UpsertEntries = function (entries) {
+        entries = entries || [];
+
+        return buildDictionaryGridContext()
+        .then(function (context) {
+            var activeContext = dictionaryGridContext || context;
+            var modelPromise = (w2ui.translationDictionaryGrid && dictionaryGridContext)
+                ? Promise.resolve(getCurrentDictionaryGridModel())
+                : loadDictionaryModel(true, activeContext);
+
+            return modelPromise
+            .then(function (model) {
+                model = model || {};
+                model.sourceLcid = String(activeContext.baseLcid || model.sourceLcid || "");
+                model.entries = model.entries || [];
+
+                var existingBySource = {};
+                for (var i = 0; i < model.entries.length; i++) {
+                    var existingEntry = model.entries[i];
+                    if (!existingEntry || !existingEntry.sourceText) {
+                        continue;
+                    }
+
+                    existingEntry.targets = existingEntry.targets || {};
+                    existingBySource[buildLookupKey(existingEntry.sourceText)] = existingEntry;
+                }
+
+                var addedEntries = 0;
+                var updatedEntries = 0;
+                var targetCount = 0;
+
+                for (var j = 0; j < entries.length; j++) {
+                    var entry = entries[j] || {};
+                    var sourceText = String(entry.sourceText || "").trim();
+                    var targets = entry.targets || {};
+                    var targetLcids = Object.keys(targets);
+
+                    if (!sourceText || !targetLcids.length) {
+                        continue;
+                    }
+
+                    var sourceKey = buildLookupKey(sourceText);
+                    var modelEntry = existingBySource[sourceKey];
+                    var isNewEntry = false;
+
+                    if (!modelEntry) {
+                        modelEntry = {
+                            sourceText: sourceText,
+                            isActive: true,
+                            targets: {}
+                        };
+                        model.entries.push(modelEntry);
+                        existingBySource[sourceKey] = modelEntry;
+                        addedEntries++;
+                        isNewEntry = true;
+                    }
+                    else {
+                        modelEntry.isActive = true;
+                        modelEntry.targets = modelEntry.targets || {};
+                    }
+
+                    var entryTargetCount = 0;
+                    for (var t = 0; t < targetLcids.length; t++) {
+                        var targetLcid = String(targetLcids[t]);
+                        var targetText = String(targets[targetLcid] || "").trim();
+
+                        if (!targetLcid || !targetText) {
+                            continue;
+                        }
+
+                        modelEntry.targets[targetLcid] = targetText;
+                        targetCount++;
+                        entryTargetCount++;
+                    }
+
+                    if (!isNewEntry && entryTargetCount > 0) {
+                        updatedEntries++;
+                    }
+                }
+
+                if (targetCount === 0) {
+                    throw new Error("No dictionary target translations to save.");
+                }
+
+                return saveDictionaryModel(toGridRecords(model, activeContext), activeContext)
+                .then(function (savedModel) {
+                    if (w2ui.translationDictionaryGrid && dictionaryGridContext) {
+                        var grid = w2ui.translationDictionaryGrid;
+                        grid.clear();
+                        grid.add(toGridRecords(savedModel, dictionaryGridContext));
+                        ensureDictionaryInputRow(grid, dictionaryGridContext);
+                        dictionaryBaselineSignature = createDictionarySignature(savedModel);
+                        grid.refresh();
+                    }
+
+                    return {
+                        addedEntries: addedEntries,
+                        updatedEntries: updatedEntries,
+                        targetCount: targetCount,
+                        model: savedModel
+                    };
+                });
+            });
+        });
     };
 
     TranslationDictionaryService.ShowDictionaryPrompt = function () {
