@@ -1,12 +1,13 @@
 <#
 .SYNOPSIS
-    Removes all non-base-language entries from unpacked Dataverse solution XML files.
+    Removes all non-base-language entries from unpacked Dataverse solution XML files and stamps the About dialog version.
 
 .DESCRIPTION
     Processes all XML files in an unpacked solution folder and:
     1. Removes elements with languagecode attribute != BaseLanguageCode
     2. Removes elements with LCID attribute != BaseLanguageCode (SiteMap)
     3. Cleans <Languages> block to keep only BaseLanguageCode
+    4. Replaces the About dialog version placeholder in the unpacked XrmTranslator.js with the solution version.
 
 .PARAMETER Path
     Path to the unpacked solution folder.
@@ -28,6 +29,19 @@ $baseLanguageCodeText = [string]$BaseLanguageCode
 
 if (-not (Test-Path $Path)) {
     Write-Error "Path not found: $Path"
+    exit 1
+}
+
+$solutionXmlPath = Join-Path $Path "Other\Solution.xml"
+if (-not (Test-Path $solutionXmlPath)) {
+    Write-Error "Solution.xml not found: $solutionXmlPath"
+    exit 1
+}
+
+[xml]$solutionXml = Get-Content -Path $solutionXmlPath -Raw -Encoding UTF8
+$solutionVersion = [string]$solutionXml.ImportExportXml.SolutionManifest.Version
+if ([string]::IsNullOrWhiteSpace($solutionVersion)) {
+    Write-Error "Solution version not found in: $solutionXmlPath"
     exit 1
 }
 
@@ -84,3 +98,23 @@ foreach ($file in $xmlFiles) {
 
 Write-Host ""
 Write-Host "Done. Cleaned $totalCleaned file(s). Only base language ($baseLanguageCodeText) remains."
+
+$versionPlaceholder = "Version: x.xx.xx.xx"
+$webResourcesPath = Join-Path $Path "WebResources"
+$versionFiles = Get-ChildItem -Path $webResourcesPath -Recurse -Filter "*.js" |
+    Where-Object {
+        $content = Get-Content -Path $_.FullName -Raw -Encoding UTF8
+        $content.Contains($versionPlaceholder)
+    }
+
+if (-not $versionFiles -or $versionFiles.Count -eq 0) {
+    Write-Error "About dialog version placeholder '$versionPlaceholder' not found under: $webResourcesPath"
+    exit 1
+}
+
+foreach ($file in $versionFiles) {
+    $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
+    $content = $content.Replace($versionPlaceholder, "Version: $solutionVersion")
+    [System.IO.File]::WriteAllText($file.FullName, $content, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "  Stamped version $solutionVersion in: $($file.FullName)"
+}

@@ -833,6 +833,125 @@
         w2ui.grid_toolbar.refresh();
     }
 
+    function HasOwnProperty(obj, property) {
+        return !!obj && Object.prototype.hasOwnProperty.call(obj, property);
+    }
+
+    function GetOriginalRecordValue(record, field) {
+        if (!record) {
+            return undefined;
+        }
+
+        if (HasOwnProperty(record, field)) {
+            return record[field];
+        }
+
+        var stringField = String(field);
+        if (HasOwnProperty(record, stringField)) {
+            return record[stringField];
+        }
+
+        return undefined;
+    }
+
+    function NormalizeComparableGridValue(value) {
+        if (value === null || typeof value === "undefined") {
+            return "";
+        }
+
+        var text = String(value);
+        return (typeof w2utils !== "undefined" && w2utils.decodeTags) ? w2utils.decodeTags(text) : text;
+    }
+
+    function GridValuesEqual(left, right) {
+        return NormalizeComparableGridValue(left) === NormalizeComparableGridValue(right);
+    }
+
+    XrmTranslator.NormalizeRecordChanges = function(record) {
+        if (!record || !record.w2ui || !record.w2ui.changes) {
+            return false;
+        }
+
+        var changed = false;
+        var changes = record.w2ui.changes;
+
+        for (var field in changes) {
+            if (!HasOwnProperty(changes, field)) {
+                continue;
+            }
+
+            if (GridValuesEqual(GetOriginalRecordValue(record, field), changes[field])) {
+                delete changes[field];
+                changed = true;
+            }
+        }
+
+        if (Object.keys(changes).length === 0) {
+            delete record.w2ui.changes;
+            changed = true;
+        }
+
+        return changed;
+    };
+
+    XrmTranslator.NormalizeGridChanges = function(records) {
+        records = records || XrmTranslator.GetAllRecords();
+        var normalizedRecords = [];
+
+        for (var i = 0; i < records.length; i++) {
+            if (XrmTranslator.NormalizeRecordChanges(records[i])) {
+                normalizedRecords.push(records[i]);
+            }
+        }
+
+        return normalizedRecords;
+    };
+
+    XrmTranslator.HasPendingChanges = function(records) {
+        records = records || XrmTranslator.GetAllRecords();
+
+        for (var i = 0; i < records.length; i++) {
+            XrmTranslator.NormalizeRecordChanges(records[i]);
+
+            if (records[i].w2ui && records[i].w2ui.changes && Object.keys(records[i].w2ui.changes).length > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    XrmTranslator.ApplyGridChangeValue = function(record, field, value) {
+        if (!record) {
+            return false;
+        }
+
+        if (GridValuesEqual(GetOriginalRecordValue(record, field), value)) {
+            if (record.w2ui && record.w2ui.changes && HasOwnProperty(record.w2ui.changes, field)) {
+                delete record.w2ui.changes[field];
+                XrmTranslator.NormalizeRecordChanges(record);
+                return true;
+            }
+
+            return false;
+        }
+
+        if (!record.w2ui) {
+            record.w2ui = {};
+        }
+
+        if (!record.w2ui.changes) {
+            record.w2ui.changes = {};
+        }
+
+        if (HasOwnProperty(record.w2ui.changes, field) && GridValuesEqual(record.w2ui.changes[field], value)) {
+            return false;
+        }
+
+        record.w2ui.changes[field] = value;
+        return true;
+    };
+
     XrmTranslator.GetAttributeById = function(id) {
         return XrmTranslator.GetAttributeByProperty("MetadataId", id);
     }
@@ -915,21 +1034,14 @@
                 continue;
             }
 
-            if (!record.w2ui) {
-                record["w2ui"] = {};
+            if (XrmTranslator.ApplyGridChangeValue(record, result.column, (result.w2ui && result.w2ui.changes) ? result.w2ui.changes.replaced : result.replaced)) {
+                savable = true;
+                grid.refreshRow(record.recid);
             }
-
-            if (!record.w2ui.changes) {
-                record.w2ui["changes"] = {};
-            }
-
-            record.w2ui.changes[result.column] = (result.w2ui &&result.w2ui.changes) ? result.w2ui.changes.replaced : result.replaced;
-            savable = true;
-            grid.refreshRow(record.recid);
         }
 
         if (savable) {
-            XrmTranslator.SetSaveButtonDisabled(false);
+            XrmTranslator.SetSaveButtonDisabled(!XrmTranslator.HasPendingChanges());
         }
     }
 
@@ -1671,6 +1783,7 @@
     function ShowAbout () {
         var html = '<div style="padding: 25px 30px; font-size: 15px; line-height: 1.6; text-align: center;">' +
             '<h2 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Xrm Quick Translate</h2>' +
+            '<p style="margin: 0 0 10px 0; color: #777; font-size: 13px;">Version: 1.0.0.8</p>' +
             '<p style="margin: 0 0 15px 0; color: #777; font-size: 14px;">Complete Translation Management UI for Dynamics 365 / Dataverse</p>' +
             '<hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;">' +
             '<p style="text-align: justify; text-align-last: center; font-size: 14px; margin: 0; color: #444;">Developed by ' +
@@ -1974,7 +2087,29 @@
                 { field: 'schemaName', text: 'Schema Name', size: XrmTranslator.defaultSchemaNameSize, sortable: true, resizable: true, frozen: true }
             ],
             onSave: function (event) {
+                var grid = XrmTranslator.GetGrid();
+                var normalizedRecords = XrmTranslator.NormalizeGridChanges();
+                for (var i = 0; i < normalizedRecords.length; i++) {
+                    grid.refreshRow(normalizedRecords[i].recid);
+                }
+
+                if (!XrmTranslator.HasPendingChanges()) {
+                    XrmTranslator.SetSaveButtonDisabled(true);
+                    grid.refresh();
+                    return;
+                }
+
                 currentHandler.Save();
+            },
+            onChange: function (event) {
+                event.onComplete = function () {
+                    var normalizedRecords = XrmTranslator.NormalizeGridChanges();
+                    for (var i = 0; i < normalizedRecords.length; i++) {
+                        w2ui.grid.refreshRow(normalizedRecords[i].recid);
+                    }
+
+                    XrmTranslator.SetSaveButtonDisabled(!XrmTranslator.HasPendingChanges());
+                };
             },
             onSearch: function (event) {
                 event.onComplete = NormalizeGridSearchUiSoon;
@@ -2132,17 +2267,7 @@
     function RegisterReloadPrevention () {
         // Dashboards are automatically refreshed on browser window resize, we don't want to lose changes.
         window.onbeforeunload = function(e) {
-            var records = XrmTranslator.GetGrid().records;
-            var unsavedChanges = false;
-
-            for (var i = 0; i < records.length; i++) {
-                var record = records[i];
-
-                if (record.w2ui && record.w2ui.changes) {
-                    unsavedChanges = true;
-                    break;
-                }
-            }
+            var unsavedChanges = XrmTranslator.HasPendingChanges();
 
             if (unsavedChanges) {
                 var warning = "There are unsaved changes in the dashboard, are you sure you want to reload and discard changes?";

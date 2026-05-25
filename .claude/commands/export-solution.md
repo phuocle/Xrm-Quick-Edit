@@ -52,12 +52,12 @@ pac solution unpack --zipfile solutions/1.before/XrmQuickTranslate.zip --folder 
 
 Using `--packagetype Both` unpacks both managed and unmanaged into the same folder.
 
-**Step 5: Clean non-English languages**
+**Step 5: Clean non-English languages and stamp About version**
 
-Run the PowerShell script to remove all non-1033 language entries:
+Run the PowerShell script to remove all non-1033 language entries and replace the About dialog `Version: x.xx.xx.xx` placeholder in the unpacked `XrmTranslator.js` web resource with the version from `solutions/2.unpack/Other/Solution.xml`:
 
 ```bash
-powershell -ExecutionPolicy Bypass -File solutions/clean-language.ps1 -Path solutions/2.unpack
+powershell -ExecutionPolicy Bypass -File solutions/clean-language.ps1 -Path solutions/2.unpack -BaseLanguageCode 1033
 ```
 
 **Step 6: Repack to `solutions/3.after/`**

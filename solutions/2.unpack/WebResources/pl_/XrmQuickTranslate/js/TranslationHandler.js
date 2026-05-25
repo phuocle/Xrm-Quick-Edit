@@ -52,6 +52,14 @@
         return record[lcid] || record[String(lcid)] || "";
     }
 
+    function GetTranslationResultValue(result) {
+        if (result.w2ui && result.w2ui.changes && Object.prototype.hasOwnProperty.call(result.w2ui.changes, "translation")) {
+            return result.w2ui.changes.translation;
+        }
+
+        return result.translation;
+    }
+
     function NormalizeTranslationText(value) {
         if (value === null || typeof value === "undefined") {
             return "";
@@ -596,7 +604,7 @@
 
     TranslationHandler.ApplyTranslations = function (selected, results) {
         var grid = XrmTranslator.GetGrid();
-        var savable = false;
+        var gridChanged = false;
 
         function hasSearchValue(value) {
             return value !== null && typeof value !== "undefined" && String(value).trim() !== "";
@@ -636,21 +644,14 @@
                 continue;
             }
 
-            if (!record.w2ui) {
-                record["w2ui"] = {};
+            if (XrmTranslator.ApplyGridChangeValue(record, result.column, GetTranslationResultValue(result))) {
+                gridChanged = true;
+                grid.refreshRow(record.recid);
             }
-
-            if (!record.w2ui.changes) {
-                record.w2ui["changes"] = {};
-            }
-
-            record.w2ui.changes[result.column] = (result.w2ui &&result.w2ui.changes) ? result.w2ui.changes.translation : result.translation;
-            savable = true;
-            grid.refreshRow(record.recid);
         }
 
-        if (savable) {
-            XrmTranslator.SetSaveButtonDisabled(false);
+        if (gridChanged) {
+            XrmTranslator.SetSaveButtonDisabled(!XrmTranslator.HasPendingChanges());
             grid.refresh();
         }
 
@@ -707,25 +708,18 @@
                     continue;
                 }
 
-                if (!record.w2ui) {
-                    record.w2ui = {};
-                }
-
-                if (!record.w2ui.changes) {
-                    record.w2ui.changes = {};
-                }
-
                 for (var j = 0; j < targetColumns.length; j++) {
                     var targetLcid = targetColumns[j];
-                    record.w2ui.changes[targetLcid] = sourceValue + " " + targetLcid + " " + randomSuffix3();
-                    updates++;
+                    if (XrmTranslator.ApplyGridChangeValue(record, targetLcid, sourceValue + " " + targetLcid + " " + randomSuffix3())) {
+                        updates++;
+                    }
                 }
 
                 grid.refreshRow(record.recid);
             }
 
             if (updates > 0) {
-                XrmTranslator.SetSaveButtonDisabled(false);
+                XrmTranslator.SetSaveButtonDisabled(!XrmTranslator.HasPendingChanges());
             }
 
             XrmTranslator.UnlockGrid();
@@ -752,24 +746,17 @@
                     continue;
                 }
 
-                if (!record.w2ui) {
-                    record.w2ui = {};
-                }
-
-                if (!record.w2ui.changes) {
-                    record.w2ui.changes = {};
-                }
-
                 for (var j = 0; j < targetColumns.length; j++) {
-                    record.w2ui.changes[targetColumns[j]] = "";
-                    updates++;
+                    if (XrmTranslator.ApplyGridChangeValue(record, targetColumns[j], "")) {
+                        updates++;
+                    }
                 }
 
                 grid.refreshRow(record.recid);
             }
 
             if (updates > 0) {
-                XrmTranslator.SetSaveButtonDisabled(false);
+                XrmTranslator.SetSaveButtonDisabled(!XrmTranslator.HasPendingChanges());
             }
 
             XrmTranslator.UnlockGrid();
@@ -1591,18 +1578,14 @@
                         var record = XrmTranslator.GetByRecId(allRecords, result.recid);
                         if (!record) continue;
 
-                        if (!record.w2ui) record.w2ui = {};
-                        if (!record.w2ui.changes) record.w2ui.changes = {};
-
-                        record.w2ui.changes[result.column] = result.translation;
-                        totalApplied++;
-                        grid.refreshRow(record.recid);
+                        if (XrmTranslator.ApplyGridChangeValue(record, result.column, result.translation)) {
+                            totalApplied++;
+                            grid.refreshRow(record.recid);
+                        }
                     }
                 }
 
-                if (totalApplied > 0) {
-                    XrmTranslator.SetSaveButtonDisabled(false);
-                }
+                XrmTranslator.SetSaveButtonDisabled(!XrmTranslator.HasPendingChanges());
 
                 XrmTranslator.UnlockGrid();
                 w2alert("Applied " + totalApplied + " dictionary translation(s).");
