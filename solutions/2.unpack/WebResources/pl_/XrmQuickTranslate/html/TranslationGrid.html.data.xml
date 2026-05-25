@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WebResource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <WebResourceId>{536bcfd7-a12d-f111-88b5-7ced8de5c223}</WebResourceId>
+  <Name>pl_/XrmQuickTranslate/html/TranslationGrid.html</Name>
+  <DisplayName>Xrm Quick Translate</DisplayName>
+  <Description>1.0.0.0</Description>
+  <LanguageCode>0</LanguageCode>
+  <WebResourceType>1</WebResourceType>
+  <IntroducedVersion>1.0</IntroducedVersion>
+  <IsEnabledForMobileClient>0</IsEnabledForMobileClient>
+  <IsAvailableForMobileOffline>0</IsAvailableForMobileOffline>
+  <IsCustomizable>1</IsCustomizable>
+  <CanBeDeleted>1</CanBeDeleted>
+  <IsHidden>0</IsHidden>
+  <FileName>/WebResources/pl_XrmQuickTranslatehtmlTranslationGridhtml536BCFD7-A12D-F111-88B5-7CED8DE5C223</FileName>
+</WebResource>

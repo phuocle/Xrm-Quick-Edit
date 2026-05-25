@@ -1,0 +1,142 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ImportExportXml version="9.2.26051.148" SolutionPackageVersion="9.2" languagecode="1033" generatedBy="CrmLive" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" OrganizationVersion="9.2.26051.148" OrganizationSchemaType="Standard" CRMServerServiceabilityVersion="9.2.26051.00148">
+  <SolutionManifest>
+    <UniqueName>XrmQuickTranslate</UniqueName>
+    <LocalizedNames>
+      <LocalizedName description="Xrm Quick Translate" languagecode="1033" />
+    </LocalizedNames>
+    <Descriptions />
+    <Version>1.0.0.7</Version>
+    <Managed>2</Managed>
+    <Publisher>
+      <UniqueName>pl</UniqueName>
+      <LocalizedNames>
+        <LocalizedName description="PL" languagecode="1033" />
+      </LocalizedNames>
+      <Descriptions />
+      <EMailAddress xsi:nil="true"></EMailAddress>
+      <SupportingWebsiteUrl xsi:nil="true"></SupportingWebsiteUrl>
+      <CustomizationPrefix>pl</CustomizationPrefix>
+      <CustomizationOptionValuePrefix>77777</CustomizationOptionValuePrefix>
+      <Addresses>
+        <Address>
+          <AddressNumber>1</AddressNumber>
+          <AddressTypeCode>1</AddressTypeCode>
+          <City xsi:nil="true"></City>
+          <County xsi:nil="true"></County>
+          <Country xsi:nil="true"></Country>
+          <Fax xsi:nil="true"></Fax>
+          <FreightTermsCode xsi:nil="true"></FreightTermsCode>
+          <ImportSequenceNumber xsi:nil="true"></ImportSequenceNumber>
+          <Latitude xsi:nil="true"></Latitude>
+          <Line1 xsi:nil="true"></Line1>
+          <Line2 xsi:nil="true"></Line2>
+          <Line3 xsi:nil="true"></Line3>
+          <Longitude xsi:nil="true"></Longitude>
+          <Name xsi:nil="true"></Name>
+          <PostalCode xsi:nil="true"></PostalCode>
+          <PostOfficeBox xsi:nil="true"></PostOfficeBox>
+          <PrimaryContactName xsi:nil="true"></PrimaryContactName>
+          <ShippingMethodCode>1</ShippingMethodCode>
+          <StateOrProvince xsi:nil="true"></StateOrProvince>
+          <Telephone1 xsi:nil="true"></Telephone1>
+          <Telephone2 xsi:nil="true"></Telephone2>
+          <Telephone3 xsi:nil="true"></Telephone3>
+          <TimeZoneRuleVersionNumber xsi:nil="true"></TimeZoneRuleVersionNumber>
+          <UPSZone xsi:nil="true"></UPSZone>
+          <UTCOffset xsi:nil="true"></UTCOffset>
+          <UTCConversionTimeZoneCode xsi:nil="true"></UTCConversionTimeZoneCode>
+        </Address>
+        <Address>
+          <AddressNumber>2</AddressNumber>
+          <AddressTypeCode>1</AddressTypeCode>
+          <City xsi:nil="true"></City>
+          <County xsi:nil="true"></County>
+          <Country xsi:nil="true"></Country>
+          <Fax xsi:nil="true"></Fax>
+          <FreightTermsCode xsi:nil="true"></FreightTermsCode>
+          <ImportSequenceNumber xsi:nil="true"></ImportSequenceNumber>
+          <Latitude xsi:nil="true"></Latitude>
+          <Line1 xsi:nil="true"></Line1>
+          <Line2 xsi:nil="true"></Line2>
+          <Line3 xsi:nil="true"></Line3>
+          <Longitude xsi:nil="true"></Longitude>
+          <Name xsi:nil="true"></Name>
+          <PostalCode xsi:nil="true"></PostalCode>
+          <PostOfficeBox xsi:nil="true"></PostOfficeBox>
+          <PrimaryContactName xsi:nil="true"></PrimaryContactName>
+          <ShippingMethodCode>1</ShippingMethodCode>
+          <StateOrProvince xsi:nil="true"></StateOrProvince>
+          <Telephone1 xsi:nil="true"></Telephone1>
+          <Telephone2 xsi:nil="true"></Telephone2>
+          <Telephone3 xsi:nil="true"></Telephone3>
+          <TimeZoneRuleVersionNumber xsi:nil="true"></TimeZoneRuleVersionNumber>
+          <UPSZone xsi:nil="true"></UPSZone>
+          <UTCOffset xsi:nil="true"></UTCOffset>
+          <UTCConversionTimeZoneCode xsi:nil="true"></UTCConversionTimeZoneCode>
+        </Address>
+      </Addresses>
+    </Publisher>
+    <RootComponents>
+      <RootComponent type="61" schemaName="pl_/img/app-icon.svg" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/config/XrmQuickTranslateConfig.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/css/style.css" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/css/w2ui.css" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/html/PropertyEditorGrid.html" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/html/TranslationGrid.html" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/AllInOneHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/AttributeHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/AttributePropertyHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/BpfHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/ChartHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/ContentSnippetHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/DialogHelper.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/EntityHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/EntityPropertyHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/FormHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/FormMetaHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/GlobalOptionSetHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/OptionSetHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/RelationshipHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/SiteMapHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/TranslationDictionaryService.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/TranslationHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/ViewHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/w2ui.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/WebApiClient.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/WebResourceHandler.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/XrmPropertyEditor.js" behavior="0" />
+      <RootComponent type="61" schemaName="pl_/XrmQuickTranslate/js/XrmTranslator.js" behavior="0" />
+      <RootComponent type="62" schemaName="pl_XrmQuickTranslate" behavior="0" />
+      <RootComponent type="80" schemaName="pl_XrmQuickTranslate" behavior="0" />
+    </RootComponents>
+    <MissingDependencies>
+      <MissingDependency>
+        <Required type="SettingDefinition" displayName="AppChannel" solution="msdyn_AppFrameworkInfraExtensions (1.0.0.16)" id.uniquename="AppChannel">
+          <package appName="PowerAppsAppFramework Package" version="1.0.0.25">PowerAppsAppFramework_Anchor (1.0.0.25)</package>
+        </Required>
+        <Dependent type="AppSetting" displayName="parentappmoduleid.uniquename=pl_XrmQuickTranslate,settingdefinitionid.uniquename=AppChannel" id.parentappmoduleid.uniquename="pl_XrmQuickTranslate" id.settingdefinitionid.uniquename="AppChannel" />
+      </MissingDependency>
+      <MissingDependency>
+        <Required type="SettingDefinition" displayName="appcopilotenabled" solution="msdyn_AppCopilotAppInfraSettings (9.2.2026052.260501061)" id.uniquename="appcopilotenabled">
+          <package appName="PowerAppsAppCopilotApp Package" version="1.0.0.2">msdyn_SuggestedAction (1.0.0.2)</package>
+          <package appName="PowerAppsAppCopilotApp Package" version="9.2.0.5">msdyn_M365CopilotAppInfraSettings (9.2.0.5)</package>
+        </Required>
+        <Dependent type="AppSetting" displayName="parentappmoduleid.uniquename=pl_XrmQuickTranslate,settingdefinitionid.uniquename=appcopilotenabled" id.parentappmoduleid.uniquename="pl_XrmQuickTranslate" id.settingdefinitionid.uniquename="appcopilotenabled" />
+      </MissingDependency>
+      <MissingDependency>
+        <Required type="SettingDefinition" displayName="enablecopilotautotriggersummarize" solution="msdyn_AppCopilotAppInfraSettings (9.2.2026052.260501061)" id.uniquename="enablecopilotautotriggersummarize">
+          <package appName="PowerAppsAppCopilotApp Package" version="1.0.0.2">msdyn_SuggestedAction (1.0.0.2)</package>
+          <package appName="PowerAppsAppCopilotApp Package" version="9.2.0.5">msdyn_M365CopilotAppInfraSettings (9.2.0.5)</package>
+        </Required>
+        <Dependent type="AppSetting" displayName="parentappmoduleid.uniquename=pl_XrmQuickTranslate,settingdefinitionid.uniquename=enablecopilotautotriggersummarize" id.parentappmoduleid.uniquename="pl_XrmQuickTranslate" id.settingdefinitionid.uniquename="enablecopilotautotriggersummarize" />
+      </MissingDependency>
+      <MissingDependency>
+        <Required type="SettingDefinition" displayName="m365copilotmodelappenabled" solution="msdyn_M365CopilotAppInfraSettings (9.2.0.5)" id.uniquename="m365copilotmodelappenabled">
+          <package appName="PowerAppsAppCopilotApp Package" version="9.2.0.5">msdyn_M365CopilotAppInfraSettings (9.2.0.5)</package>
+        </Required>
+        <Dependent type="AppSetting" displayName="parentappmoduleid.uniquename=pl_XrmQuickTranslate,settingdefinitionid.uniquename=m365copilotmodelappenabled" id.parentappmoduleid.uniquename="pl_XrmQuickTranslate" id.settingdefinitionid.uniquename="m365copilotmodelappenabled" />
+      </MissingDependency>
+    </MissingDependencies>
+  </SolutionManifest>
+</ImportExportXml>

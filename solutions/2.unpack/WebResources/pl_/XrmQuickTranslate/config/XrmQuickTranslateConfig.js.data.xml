@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WebResource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <WebResourceId>{36a5a4be-c655-f111-a825-7ced8db48acd}</WebResourceId>
+  <Name>pl_/XrmQuickTranslate/config/XrmQuickTranslateConfig.js</Name>
+  <DisplayName>pl_/XrmQuickTranslate/config/XrmQuickTranslateConfig.js</DisplayName>
+  <Description>Default configuration for Xrm Quick Translate.</Description>
+  <WebResourceType>3</WebResourceType>
+  <IntroducedVersion>1.0</IntroducedVersion>
+  <IsEnabledForMobileClient>0</IsEnabledForMobileClient>
+  <IsAvailableForMobileOffline>0</IsAvailableForMobileOffline>
+  <IsCustomizable>1</IsCustomizable>
+  <CanBeDeleted>1</CanBeDeleted>
+  <IsHidden>0</IsHidden>
+  <FileName>/WebResources/pl_XrmQuickTranslateconfigXrmQuickTranslateConfigj36A5A4BE-C655-F111-A825-7CED8DB48ACD</FileName>
+</WebResource>
